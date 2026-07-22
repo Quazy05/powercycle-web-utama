@@ -43,6 +43,11 @@ export default function UserPage() {
         if (dataDep.success) allDeposits = [...allDeposits, ...dataDep.deposits];
         if (dataTemp.success) allDeposits = [...allDeposits, ...dataTemp.deposits];
         
+        // Deduplicate deposits by id to prevent duplicate React key console errors
+        const uniqueMap = new Map();
+        allDeposits.forEach(d => { if (d && d.id) uniqueMap.set(d.id, d); });
+        allDeposits = Array.from(uniqueMap.values());
+
         // Sort combined deposits by date and time descending
         allDeposits.sort((a, b) => {
           const dateA = new Date(`${a.date}T${a.time}`);
@@ -103,7 +108,11 @@ export default function UserPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setDeposits(prev => [{...deposit, id: data.id, status: 'Menunggu Validasi'}, ...prev]);
+        const newDep = { ...deposit, id: data.id, status: 'Menunggu Validasi' };
+        setDeposits(prev => {
+          const filtered = prev.filter(d => d.id !== data.id);
+          return [newDep, ...filtered];
+        });
         return { success: true, id: data.id };
       } else {
         alert('Gagal menambah setoran: ' + data.error);

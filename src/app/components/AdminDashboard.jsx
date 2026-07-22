@@ -425,7 +425,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
             </thead>
             <tbody>
               {unitDeposits.slice(0, 5).map((d, i) => (
-                <tr key={d.id} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+                <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
                   <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date}</td>
                   <td style={{ padding: '14px 18px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.user}</td>
                   <td style={{ padding: '14px 18px' }}>
@@ -486,7 +486,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
           </thead>
           <tbody>
             {paginatedDeposits.map((d, i) => (
-              <tr key={d.id} onClick={() => setSelectedRow(selectedRow?.id === d.id ? null : d)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === d.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer', transition: 'background 0.2s' }}>
+              <tr key={`${d.id}-${i}`} onClick={() => setSelectedRow(selectedRow?.id === d.id ? null : d)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === d.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer', transition: 'background 0.2s' }}>
                 <td style={{ padding: '14px 18px' }}>
                   <input type="radio" checked={selectedRow?.id === d.id} onChange={() => setSelectedRow(d)} style={{ cursor: 'pointer' }} />
                 </td>

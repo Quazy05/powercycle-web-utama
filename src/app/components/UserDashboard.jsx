@@ -419,7 +419,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
             </thead>
             <tbody>
               {dashboardFilteredDeposits.slice(0, 5).map((d, i) => (
-                <tr key={d.id} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+                <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
                   <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date}</td>
                   <td style={{ padding: '14px 18px' }}>
                     <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -562,7 +562,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
           </thead>
           <tbody>
             {riwayatFilteredDeposits.map((d, i) => (
-              <tr key={d.id} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+              <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
                 <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date} <span style={{ color: 'var(--ds-text-muted)', fontSize: '0.8rem' }}>{d.time}</span></td>
                 <td style={{ padding: '14px 18px' }}>
                   <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -1102,7 +1102,7 @@ const renderBuktiBayar = () => (
             <p style={{ margin: '0 0 24px', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Silakan tunjukkan QR Code ini kepada Petugas Verifikasi di Website Validasi untuk divalidasi.</p>
             
             <div style={{ background: 'white', padding: 16, border: '1px solid var(--ds-border)', borderRadius: 16, display: 'inline-block', marginBottom: 24, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-              <QRCodeSVG id="qr-code-svg" value={`${process.env.NEXT_PUBLIC_VALIDASI_URL || 'https://powercycle-web-validator.vercel.app'}/validator/verify/${generatedQr}`} size={200} />
+              <QRCodeSVG id="qr-code-svg" value={`${process.env.NEXT_PUBLIC_VALIDASI_URL || 'https://powercycle-web-validator.vercel.app'}/validate/${generatedQr}`} size={200} />
             </div>
             
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>

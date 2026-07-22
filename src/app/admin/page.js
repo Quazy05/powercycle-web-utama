@@ -46,6 +46,11 @@ export default function AdminPage() {
       if (dataDep.success) allDeposits = [...allDeposits, ...dataDep.deposits];
       if (dataTemp.success) allDeposits = [...allDeposits, ...dataTemp.deposits];
       
+      // Deduplicate deposits by id to prevent duplicate React key console errors
+      const uniqueMap = new Map();
+      allDeposits.forEach(d => { if (d && d.id) uniqueMap.set(d.id, d); });
+      allDeposits = Array.from(uniqueMap.values());
+
       allDeposits.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
 
       setDeposits(allDeposits);
