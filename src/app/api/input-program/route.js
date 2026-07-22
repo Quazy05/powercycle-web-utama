@@ -42,7 +42,7 @@ export async function POST(request) {
       if (form_data && typeof form_data === 'object') {
         const numericValues = Object.values(form_data).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
         if (numericValues.length > 0) {
-          weight = numericValues[0];
+          weight = numericValues.reduce((sum, v) => sum + v, 0);
         }
       }
 

@@ -70,6 +70,40 @@ export default function AdminPage() {
     fetchData();
   }, [fetchData, role, router]);
 
+  // Cron Job: Sinkronisasi data MySQL ↔ Firebase setiap 1 menit
+  useEffect(() => {
+    if (role !== 'admin sis' && role !== 'admin llk') return;
+    
+    const syncInterval = parseInt(process.env.NEXT_PUBLIC_SYNC_INTERVAL || '60000', 10);
+    
+    const runSync = async () => {
+      try {
+        const res = await fetch('/api/cron/sync');
+        const data = await res.json();
+        if (data.success) {
+          const total = (data.push_count || 0) + (data.pull_count || 0);
+          if (total > 0) {
+            console.log(`[Cron Sync] Push: ${data.push_count}, Pull: ${data.pull_count}`);
+            triggerNotification(`Sync berhasil: ${data.push_count} push, ${data.pull_count} pull`, 'success');
+            await fetchData(); // Refresh data setelah sync
+          }
+        }
+      } catch (err) {
+        console.error('[Cron Sync] Error:', err);
+      }
+    };
+
+    // Jalankan sync pertama kali setelah 5 detik
+    const initialTimeout = setTimeout(runSync, 5000);
+    // Lalu setiap interval (default 1 menit)
+    const interval = setInterval(runSync, syncInterval);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [role, fetchData]);
+
   const handleLogout = () => { logout(); router.push('/'); };
 
   const handleUpdateBuktiStatus = async (id, status, remarks = '') => {

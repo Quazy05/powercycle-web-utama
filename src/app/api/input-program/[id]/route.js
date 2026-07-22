@@ -30,7 +30,7 @@ export async function PUT(request, { params }) {
       }
       if (oldFormData && typeof oldFormData === 'object') {
         const numericValues = Object.values(oldFormData).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
-        if (numericValues.length > 0) oldWeight = numericValues[0];
+        if (numericValues.length > 0) oldWeight = numericValues.reduce((sum, v) => sum + v, 0);
       }
       if (oldWeight > 0) {
         const oldMonth = (oldData.date || '').substring(0, 7);
@@ -46,7 +46,7 @@ export async function PUT(request, { params }) {
       let newWeight = 0;
       if (form_data && typeof form_data === 'object') {
         const numericValues = Object.values(form_data).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
-        if (numericValues.length > 0) newWeight = numericValues[0];
+        if (numericValues.length > 0) newWeight = numericValues.reduce((sum, v) => sum + v, 0);
       }
       if (newWeight > 0) {
         const newMonth = date.substring(0, 7);
@@ -86,7 +86,7 @@ export async function DELETE(request, { params }) {
       }
       if (oldFormData && typeof oldFormData === 'object') {
         const numericValues = Object.values(oldFormData).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
-        if (numericValues.length > 0) oldWeight = numericValues[0];
+        if (numericValues.length > 0) oldWeight = numericValues.reduce((sum, v) => sum + v, 0);
       }
       if (oldWeight > 0) {
         const oldMonth = (oldData.date || '').substring(0, 7);

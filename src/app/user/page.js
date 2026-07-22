@@ -65,6 +65,21 @@ export default function UserPage() {
     fetchData();
   }, [role, username, unit, router]);
 
+  // Cron Sync otomatis di background
+  useEffect(() => {
+    if (role !== 'user') return;
+    const syncInterval = parseInt(process.env.NEXT_PUBLIC_SYNC_INTERVAL || '60000', 10);
+    const runSync = async () => {
+      try {
+        await fetch('/api/cron/sync');
+      } catch (err) {
+        console.error('[User Cron Sync] Error:', err);
+      }
+    };
+    const interval = setInterval(runSync, syncInterval);
+    return () => clearInterval(interval);
+  }, [role]);
+
   if (role !== 'user') return null;
   if (loading) {
     return (

@@ -1099,10 +1099,10 @@ const renderBuktiBayar = () => (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease-out' }}>
           <div style={{ background: 'white', width: '100%', maxWidth: 360, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)', animation: 'scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', textAlign: 'center' }}>
             <h3 style={{ margin: '0 0 16px', fontSize: '1.25rem', fontWeight: 800, color: 'var(--ds-text)', letterSpacing: '-0.5px' }}>Tunjukkan QR Code</h3>
-            <p style={{ margin: '0 0 24px', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Silakan tunjukkan QR Code ini kepada Petugas Verifikasi untuk divalidasi.</p>
+            <p style={{ margin: '0 0 24px', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Silakan tunjukkan QR Code ini kepada Petugas Verifikasi di Website Validasi untuk divalidasi.</p>
             
             <div style={{ background: 'white', padding: 16, border: '1px solid var(--ds-border)', borderRadius: 16, display: 'inline-block', marginBottom: 24, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-              <QRCodeSVG id="qr-code-svg" value={`${window.location.origin}/validator/verify/${generatedQr}`} size={200} />
+              <QRCodeSVG id="qr-code-svg" value={`${process.env.NEXT_PUBLIC_VALIDASI_URL || 'https://powercycle-web-validator.vercel.app'}/validator/verify/${generatedQr}`} size={200} />
             </div>
             
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>

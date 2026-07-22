@@ -1,9 +1,13 @@
--- SQL Schema Initialization for Bank Sampah (Powercycle)
+-- SQL Schema Initialization for Bank Sampah PLTA Mrica
+-- Database: bank_sampah_mrica
 
 CREATE DATABASE IF NOT EXISTS bank_sampah_mrica;
 USE bank_sampah_mrica;
 
+-- ============================================
 -- 0. Master Tables & Notifications
+-- ============================================
+
 CREATE TABLE IF NOT EXISTS master_unit (
   id INT AUTO_INCREMENT PRIMARY KEY,
   nama_unit VARCHAR(100) NOT NULL UNIQUE
@@ -31,19 +35,23 @@ CREATE TABLE IF NOT EXISTS notifications (
   target_role VARCHAR(50) DEFAULT 'Admin SIS'
 );
 
--- 1. users
+-- ============================================
+-- 1. users (Validator role dihapus)
+-- ============================================
 CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(50) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  role ENUM('Admin SIS', 'Admin LLK', 'Validator', 'User') NOT NULL,
+  role ENUM('Admin SIS', 'Admin LLK', 'User') NOT NULL,
   unit VARCHAR(50) NOT NULL,
   joinDate DATE NOT NULL,
   status ENUM('Aktif', 'Non-Aktif') DEFAULT 'Aktif'
 );
 
+-- ============================================
 -- 2. clients
+-- ============================================
 CREATE TABLE IF NOT EXISTS clients (
   id VARCHAR(50) PRIMARY KEY,
   name VARCHAR(150) NOT NULL,
@@ -52,7 +60,9 @@ CREATE TABLE IF NOT EXISTS clients (
   joinDate DATE NOT NULL
 );
 
--- 3. deposits
+-- ============================================
+-- 3. deposits (data terverifikasi dari Firebase)
+-- ============================================
 CREATE TABLE IF NOT EXISTS deposits (
   id VARCHAR(50) PRIMARY KEY,
   date VARCHAR(10) NOT NULL,
@@ -64,11 +74,13 @@ CREATE TABLE IF NOT EXISTS deposits (
   jenis VARCHAR(50) NOT NULL,
   pengelola VARCHAR(100) NOT NULL,
   weight DECIMAL(10,2) NOT NULL,
-  status ENUM('Pending', 'Terverifikasi', 'Ditolak') DEFAULT 'Pending',
+  status ENUM('Pending', 'Terverifikasi', 'Ditolak', 'Menunggu Validasi') DEFAULT 'Pending',
   remarks TEXT
 );
 
--- 3a. temporary_deposits (Mock Firebase)
+-- ============================================
+-- 3a. temporary_deposits (local staging sebelum push ke Firebase)
+-- ============================================
 CREATE TABLE IF NOT EXISTS temporary_deposits (
   id VARCHAR(50) PRIMARY KEY,
   date VARCHAR(10) NOT NULL,
@@ -82,20 +94,28 @@ CREATE TABLE IF NOT EXISTS temporary_deposits (
   weight DECIMAL(10,2) NOT NULL,
   status ENUM('Menunggu Validasi', 'Ditolak') DEFAULT 'Menunggu Validasi',
   remarks TEXT,
-  alasan_penolakan TEXT
+  alasan_penolakan TEXT,
+  synced BOOLEAN DEFAULT FALSE,
+  synced_at DATETIME DEFAULT NULL
 );
 
--- 4. neraca_sampah
+-- ============================================
+-- 4. neraca_sampah (bulanan, per unit)
+-- ============================================
 CREATE TABLE IF NOT EXISTS neraca_sampah (
-  id VARCHAR(50) PRIMARY KEY,
+  id INT AUTO_INCREMENT PRIMARY KEY,
   month VARCHAR(7) NOT NULL,
+  unit VARCHAR(50) NOT NULL DEFAULT '',
   category ENUM('Organik', 'Anorganik', 'Residu') NOT NULL,
   jenis VARCHAR(50) NOT NULL,
-  timbulan DECIMAL(10,2) NOT NULL,
-  dimanfaatkan DECIMAL(10,2) NOT NULL
+  timbulan DECIMAL(10,2) NOT NULL DEFAULT 0,
+  dimanfaatkan DECIMAL(10,2) NOT NULL DEFAULT 0,
+  UNIQUE KEY uq_neraca (month, unit, category, jenis)
 );
 
+-- ============================================
 -- 4a. neraca_sampah_tahunan (Historical Data in Ton)
+-- ============================================
 CREATE TABLE IF NOT EXISTS neraca_sampah_tahunan (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tahun VARCHAR(4) NOT NULL,
@@ -106,7 +126,9 @@ CREATE TABLE IF NOT EXISTS neraca_sampah_tahunan (
   residu_tpa DECIMAL(10,5) NOT NULL
 );
 
+-- ============================================
 -- 4b. rekapitulasi_program (Historical Data)
+-- ============================================
 CREATE TABLE IF NOT EXISTS rekapitulasi_program (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tahun VARCHAR(4) NOT NULL,
@@ -116,7 +138,9 @@ CREATE TABLE IF NOT EXISTS rekapitulasi_program (
   absolut_ton DECIMAL(10,5) NOT NULL
 );
 
+-- ============================================
 -- 5. bukti_bayar
+-- ============================================
 CREATE TABLE IF NOT EXISTS bukti_bayar (
   id VARCHAR(50) PRIMARY KEY,
   month VARCHAR(7) NOT NULL,
@@ -126,7 +150,9 @@ CREATE TABLE IF NOT EXISTS bukti_bayar (
   img_url LONGTEXT
 );
 
+-- ============================================
 -- 6. activity_log
+-- ============================================
 CREATE TABLE IF NOT EXISTS activity_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   timestamp VARCHAR(20) NOT NULL,
@@ -136,34 +162,60 @@ CREATE TABLE IF NOT EXISTS activity_log (
   type VARCHAR(20) NOT NULL
 );
 
+-- ============================================
+-- 7. programs (seeded dari Excel)
+-- ============================================
+CREATE TABLE IF NOT EXISTS programs (
+  id VARCHAR(100) PRIMARY KEY,
+  nama VARCHAR(255) NOT NULL,
+  deskripsi TEXT,
+  fields JSON NOT NULL
+);
 
--- 7. input_program
+-- ============================================
+-- 8. input_program (data pemanfaatan)
+-- ============================================
 CREATE TABLE IF NOT EXISTS input_program (
-  id VARCHAR(50) PRIMARY KEY,
-  program_id VARCHAR(100) NOT NULL,
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  program_id VARCHAR(100),
+  program_name VARCHAR(150) NOT NULL,
   date VARCHAR(10) NOT NULL,
   time VARCHAR(8) NOT NULL,
   user VARCHAR(100) NOT NULL,
-  unit VARCHAR(50) NOT NULL,
+  unit VARCHAR(50) NOT NULL DEFAULT 'Pusat',
   kategori_sampah VARCHAR(100),
   jenis_sampah VARCHAR(100),
   form_data JSON NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- POPULATE INITIAL MOCK DATA --
+-- ============================================
+-- 9. sync_log (cron job history)
+-- ============================================
+CREATE TABLE IF NOT EXISTS sync_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sync_type ENUM('push', 'pull') NOT NULL,
+  records_count INT NOT NULL DEFAULT 0,
+  status ENUM('success', 'error') NOT NULL,
+  details TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- POPULATE INITIAL MOCK DATA
+-- ============================================
+
 INSERT INTO users (id, name, email, password, role, unit, joinDate, status) VALUES
 ('U001', 'aby', 'aby@pln.co.id', 'aby', 'User', 'Wonogiri', '2025-01-10', 'Aktif'),
 ('U002', 'test', 'test@pln.co.id', 'test', 'User', 'Banjarnegara', '2025-01-15', 'Aktif'),
 ('U003', 'hakim', 'hakim@pln.co.id', 'hakim', 'User', 'Wonogiri', '2025-02-01', 'Aktif'),
 ('U004', 'admin_sis', 'sis@pln.co.id', 'admin', 'Admin SIS', 'Pusat', '2025-01-05', 'Aktif'),
-('U005', 'admin_llk', 'llk@pln.co.id', 'admin', 'Admin LLK', 'Pusat', '2025-01-05', 'Aktif'),
-('U006', 'validator', 'validator@pln.co.id', 'validator', 'Validator', 'Wonogiri', '2025-01-05', 'Aktif')
+('U005', 'admin_llk', 'llk@pln.co.id', 'admin', 'Admin LLK', 'Pusat', '2025-01-05', 'Aktif')
 ON DUPLICATE KEY UPDATE name=name;
 
 INSERT INTO clients (id, name, address, contact, joinDate) VALUES
 ('C001', 'PLTA Wonogiri', 'Pokoh Kidul, Wonogiri', '0273-321111', '2021-01-01'),
-('C002', 'PLTA Banjarnegara', 'Banjarnegara', '-', '2021-01-01')
+('C002', 'PLTA PB. Soedirman', 'Banjarnegara', '-', '2021-01-01')
 ON DUPLICATE KEY UPDATE name=name;
 
 INSERT INTO deposits (id, date, time, user, client, unit, category, jenis, pengelola, weight, status, remarks) VALUES
@@ -179,13 +231,13 @@ INSERT INTO deposits (id, date, time, user, client, unit, category, jenis, penge
 ('D010', '2026-06-29', '15:10', 'aby', 'PLTA Wonogiri', 'Wonogiri', 'Residu', 'Kaca', 'TPA Winong', 5.5, 'Pending', '')
 ON DUPLICATE KEY UPDATE status=status;
 
-INSERT INTO neraca_sampah (id, month, category, jenis, timbulan, dimanfaatkan) VALUES
-('N1', '2026-07', 'Organik', 'Sisa Makanan', 40.8, 35.5),
-('N2', '2026-07', 'Organik', 'Daun', 22.0, 20.0),
-('N3', '2026-07', 'Anorganik', 'Botol', 12.5, 10.0),
-('N4', '2026-07', 'Anorganik', 'Plastik', 8.2, 5.0),
-('N5', '2026-07', 'Residu', 'Lainnya', 18.0, 0)
-ON DUPLICATE KEY UPDATE month=month;
+INSERT INTO neraca_sampah (month, unit, category, jenis, timbulan, dimanfaatkan) VALUES
+('2026-07', 'Wonogiri', 'Organik', 'Sisa Makanan', 40.8, 35.5),
+('2026-07', 'Wonogiri', 'Organik', 'Daun', 22.0, 20.0),
+('2026-07', 'Wonogiri', 'Anorganik', 'Botol', 12.5, 10.0),
+('2026-07', 'Banjarnegara', 'Anorganik', 'Plastik', 8.2, 5.0),
+('2026-07', 'Banjarnegara', 'Residu', 'Lainnya', 18.0, 0)
+ON DUPLICATE KEY UPDATE timbulan=VALUES(timbulan), dimanfaatkan=VALUES(dimanfaatkan);
 
 INSERT INTO bukti_bayar (id, month, unit, no_bukti, status, img_url) VALUES
 ('B1', '2026-06', 'Wonogiri', 'INV-WON-202606', 'Lunas', 'https://via.placeholder.com/400x600?text=Bukti+Bayar+Wonogiri+Jun+2026'),
@@ -197,6 +249,6 @@ INSERT INTO activity_log (id, timestamp, user, action, detail, type) VALUES
 (1, '2026-07-02 10:00:15', 'hakim', 'Input Data Sampah', 'Organik (Daun) 22.0 kg - TPA Winong', 'input'),
 (2, '2026-07-02 09:15:22', 'test', 'Input Data Sampah', 'Anorganik (Plastik) 8.2 kg - TPA Winong', 'input'),
 (3, '2026-07-02 08:30:10', 'aby', 'Input Data Sampah', 'Organik (Sisa Makanan) 15.5 kg - TPA Winong', 'input'),
-(4, '2026-07-01 16:45:00', 'tri', 'Verifikasi Data', 'D004 - Anorganik (Botol) 12.5 kg - Status Terverifikasi', 'verify'),
-(5, '2026-07-01 15:30:00', 'tri', 'Tolak Data', 'D006 - Residu (Lainnya) 9.8 kg - Data tidak valid', 'reject')
+(4, '2026-07-01 16:45:00', 'system', 'Sync Data (Cron)', 'D004 - Anorganik (Botol) 12.5 kg - Terverifikasi dari Firebase', 'sync'),
+(5, '2026-07-01 15:30:00', 'system', 'Sync Data (Cron)', 'D006 - Residu (Lainnya) 9.8 kg - Ditolak', 'sync')
 ON DUPLICATE KEY UPDATE timestamp=timestamp;

@@ -56,7 +56,6 @@ export default function LoginPage() {
     setShowUnitModal(false);
     
     if (determinedRole === 'admin sis' || determinedRole === 'admin llk') router.push('/admin');
-    else if (determinedRole === 'validator') router.push('/validator/scan');
     else if (determinedRole === 'user') router.push('/user');
   };
 

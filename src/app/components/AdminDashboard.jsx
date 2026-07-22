@@ -468,13 +468,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
         <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
         <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
         <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
-        {selectedRow && selectedRow.status === 'Pending' && onUpdateStatus && (
-          <>
-            <div style={{ width: 1, height: 24, background: 'var(--ds-border)', margin: '0 8px' }} />
-            <button onClick={() => { onUpdateStatus(selectedRow.id, 'Terverifikasi'); setSelectedRow(null); }} style={{ padding: '8px 16px', background: '#D1FAE5', color: '#047857', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Terima</button>
-            <button onClick={() => { onUpdateStatus(selectedRow.id, 'Ditolak'); setSelectedRow(null); }} style={{ padding: '8px 16px', background: '#FEE2E2', color: '#B91C1C', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Tolak</button>
-          </>
-        )}
+
       </div>
       <div style={{ overflowX: 'auto', minHeight: 400 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
