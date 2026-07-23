@@ -1,6 +1,8 @@
 import LandingPage from './components/LandingPage';
 import { getDbConnection } from './lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   let initialDeposits = [];
   let mockUsers = [];
