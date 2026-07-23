@@ -1176,7 +1176,7 @@ const renderBuktiBayar = () => (
             <p style={{ margin: '0 0 24px', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Silakan tunjukkan QR Code ini kepada Petugas Verifikasi di Website Validasi untuk divalidasi.</p>
             
             <div style={{ background: 'white', padding: 16, border: '1px solid var(--ds-border)', borderRadius: 16, display: 'inline-block', marginBottom: 24, boxShadow: '0 4px 10px rgba(0,0,0,0.05)' }}>
-              <QRCodeSVG id="qr-code-svg" value={`${process.env.NEXT_PUBLIC_VALIDASI_URL || 'https://powercycle-web-validator.vercel.app'}/validate/${generatedQr}`} size={200} />
+              <QRCodeSVG id="qr-code-svg" value={getValidationUrl()} size={200} />
             </div>
             
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
