@@ -31,5 +31,5 @@ export const PROGRAM_PENGELOLAAN_LIST = [
   'MAGGROW'
 ];
 
-export const formatWeight = (val) => `${Number(val).toFixed(2)} Kg`;
-export const formatWeightTon = (val) => `${Number(val).toFixed(3)} Ton`;
+export const formatWeight = (val) => `${Number(String(val).replace(',', '.')).toFixed(2)} Kg`;
+export const formatWeightTon = (val) => `${Number(String(val).replace(',', '.')).toFixed(3)} Ton`;

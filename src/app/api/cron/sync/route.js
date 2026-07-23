@@ -9,7 +9,6 @@ export async function GET() {
     let pushCount = 0;
     let pullCount = 0;
 
-    // A. PUSH: MySQL temporary_deposits -> Firebase temporary_deposits
     const [tempDeposits] = await pool.query('SELECT * FROM temporary_deposits WHERE synced = 0 OR synced = FALSE');
     
     for (const record of tempDeposits) {
@@ -35,14 +34,12 @@ export async function GET() {
       pushCount++;
     }
 
-    // B. PULL: Firebase deposits collection -> MySQL deposits
     const querySnapshot = await getDocs(collection(firestore, 'deposits'));
     
     for (const docSnap of querySnapshot.docs) {
       const data = docSnap.data();
       const id = docSnap.id;
 
-      // Skip jika sudah pernah di-sync ke MySQL
       if (data.synced_to_mysql === true) {
         continue;
       }
@@ -83,8 +80,9 @@ export async function GET() {
           ]
         );
       }
-      
-      // Tandai synced_to_mysql = true di Firestore (JANGAN HAPUS DARI FIRESTORE)
+
+      await pool.query('DELETE FROM temporary_deposits WHERE id = ?', [id]);
+
       const docRef = doc(firestore, 'deposits', id);
       await setDoc(docRef, {
         synced_to_mysql: true,
@@ -94,7 +92,8 @@ export async function GET() {
       pullCount++;
     }
 
-    // C. Record sync history
+    await pool.query(`DELETE td FROM temporary_deposits td INNER JOIN deposits d ON td.id = d.id`);
+
     const details = `Pushed ${pushCount} temporary deposits. Pulled ${pullCount} verified deposits.`;
     await pool.query(
       'INSERT INTO sync_log (sync_type, records_count, status, details) VALUES (?, ?, ?, ?)',

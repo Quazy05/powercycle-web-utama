@@ -1,10 +1,10 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Fragment } from 'react';
 import {
   LayoutDashboard, PlusCircle, History, Database,
   FileCheck, BarChart2, LogOut, Trash2, Calendar,
   Clock, Package, MapPin, Scale, Info, Menu, X, Upload, Eye, Maximize2, Download, Share2,
-  FolderKanban, ClipboardList, ArrowLeft, CheckCircle2
+  FolderKanban, ClipboardList, ArrowLeft, CheckCircle2, Link2, Copy, ExternalLink
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -233,9 +233,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const img = new Image();
-    
-    // Add white background for PNG
+    const img = new Image();
     canvas.width = 240;
     canvas.height = 240;
     
@@ -290,7 +288,47 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
-  // Handler untuk mengedit data setoran
+  const getValidationUrl = () => {
+    const baseUrl = process.env.NEXT_PUBLIC_VALIDASI_URL || 'https://powercycle-web-validator.vercel.app/validator/verify/{id}';
+    return baseUrl.replace('{id}', generatedQr || '');
+  };
+
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyLink = async () => {
+    const url = getValidationUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  const handleShareLink = async () => {
+    const url = getValidationUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Link Validasi Setoran Sampah',
+          text: `Silakan validasi setoran sampah ini:`,
+          url: url
+        });
+      } catch (error) {
+        console.error('Error sharing link:', error);
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
   const handleEdit = (deposit) => {
     setEditingId(deposit.id);
     setFormData({
@@ -308,12 +346,11 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     const depData = {
       date: formData.date, time: formData.time, user: username,
       unit: userUnit, category: formData.kategori, jenis: formData.jenis,
-      pengelola: formData.pengelola, weight: parseFloat(formData.berat),
+      pengelola: formData.pengelola, weight: parseFloat(String(formData.berat).replace(',', '.')),
       status: 'Menunggu Validasi'
     };
 
-    if (editingId) {
-      // Update data setoran jika dalam mode edit
+    if (editingId) {
       await onUpdateDeposit(editingId, depData); 
       setEditingId(null);
       setFormData({ date: TODAY, time: new Date().toTimeString().slice(0, 5), kategori: 'Organik', jenis: '', pengelola: '', berat: '' });
@@ -325,9 +362,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
       }
     }
     setShowConfirmPopup(false);
-  };
-
-  // Handler untuk mengunggah kwitansi per bulan
+  };
   const handleUploadKwitansiPerBulan = (e, bulanId) => {
     const file = e.target.files[0];
     if (file) {
@@ -349,9 +384,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
 
   const handleDeleteBukti = async (id) => {
   try {
-    const res = await fetch(`/api/bukti/${id}`, { method: 'DELETE' });
-    
-    // Proses penghapusan data bukti bayar
+    const res = await fetch(`/api/bukti/${id}`, { method: 'DELETE' });
     if (!res.ok) {
        const errData = await res.json().catch(() => ({ error: 'Unknown Error' }));
        throw new Error(errData.error || 'Gagal menghapus');
@@ -419,17 +452,31 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
             </thead>
             <tbody>
               {dashboardFilteredDeposits.slice(0, 5).map((d, i) => (
-                <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
-                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date}</td>
-                  <td style={{ padding: '14px 18px' }}>
-                    <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
-                      {d.category}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.jenis}</td>
-                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{formatWeight(Number(d.weight) || 0)}</td>
-                  <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
-                </tr>
+                <Fragment key={`${d.id}-${i}`}>
+                  <tr style={{ borderBottom: d.status === 'Ditolak' && d.remarks ? 'none' : '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+                    <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date}</td>
+                    <td style={{ padding: '14px 18px' }}>
+                      <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
+                        {d.category}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.jenis}</td>
+                    <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{formatWeight(Number(d.weight) || 0)}</td>
+                    <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
+                  </tr>
+                  {d.status === 'Ditolak' && d.remarks && (
+                    <tr style={{ background: i % 2 === 0 ? 'white' : '#FAFCFD', borderBottom: '1px solid rgba(203, 213, 225, 0.4)' }}>
+                      <td colSpan="5" style={{ padding: '0px 18px 14px 18px' }}>
+                        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '10px 14px', borderRadius: 8, fontSize: '0.8rem', color: '#991B1B', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                          <div>
+                            <strong>Catatan Penolakan:</strong> {d.remarks}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
               {dashboardFilteredDeposits.length === 0 && (
                 <tr>
@@ -511,7 +558,10 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
 
         <div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--ds-text)', fontSize: '0.85rem', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}><Scale size={16} /> Berat (Kg)</label>
-          <input type="number" step="0.1" value={formData.berat} onChange={e => setFormData({ ...formData, berat: e.target.value })} placeholder="Masukkan berat sampah dalam Kg" required style={{ width: '100%', padding: '12px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '1rem', outline: 'none', boxSizing: 'border-box', color: 'var(--ds-text)', fontFamily: 'inherit', background: '#F8FAFC' }} />
+          <input type="text" inputMode="decimal" value={formData.berat} onChange={e => {
+            const val = e.target.value;
+            if (/^[0-9.,]*$/.test(val)) setFormData({ ...formData, berat: val });
+          }} placeholder="Masukkan berat sampah dalam Kg" required style={{ width: '100%', padding: '12px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '1rem', outline: 'none', boxSizing: 'border-box', color: 'var(--ds-text)', fontFamily: 'inherit', background: '#F8FAFC' }} />
         </div>
 
         <div style={{ background: '#F1F5F9', padding: 18, borderRadius: 12, display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 8 }}>
@@ -562,40 +612,64 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
           </thead>
           <tbody>
             {riwayatFilteredDeposits.map((d, i) => (
-              <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
-                <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date} <span style={{ color: 'var(--ds-text-muted)', fontSize: '0.8rem' }}>{d.time}</span></td>
-                <td style={{ padding: '14px 18px' }}>
-                  <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
-                    {d.category}
-                  </span>
-                </td>
-                <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.jenis}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.pengelola}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{formatWeight(Number(d.weight) || 0)}</td>
-                <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
-                <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                  {(d.status === 'Pending' || d.status === 'Menunggu Validasi') && (
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button onClick={() => setGeneratedQr(d.id)} style={{ background: '#E0F2FE', color: '#0284C7', border: 'none', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s' }}
-                        onMouseEnter={e => e.target.style.background = '#BAE6FD'}
-                        onMouseLeave={e => e.target.style.background = '#E0F2FE'}
-                      >
-                        Lihat QR
-                      </button>
-                      <button onClick={() => {
-                        if(window.confirm('Hapus data transaksi ini?')) {
-                          onDeleteDeposit(d.id, d.status);
-                        }
-                      }} style={{ background: '#FEE2E2', color: '#EF4444', border: 'none', padding: 8, borderRadius: 8, cursor: 'pointer', display: 'inline-flex', transition: 'all 0.2s' }}
-                        onMouseEnter={e => e.target.style.background = '#FCA5A5'}
-                        onMouseLeave={e => e.target.style.background = '#FEE2E2'}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
+              <Fragment key={`${d.id}-${i}`}>
+                <tr style={{ borderBottom: d.status === 'Ditolak' && d.remarks ? 'none' : '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date} <span style={{ color: 'var(--ds-text-muted)', fontSize: '0.8rem' }}>{d.time}</span></td>
+                  <td style={{ padding: '14px 18px' }}>
+                    <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
+                      {d.category}
+                    </span>
+                  </td>
+                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.jenis}</td>
+                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.pengelola}</td>
+                  <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{formatWeight(Number(d.weight) || 0)}</td>
+                  <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
+                  <td style={{ padding: '14px 18px', textAlign: 'right' }}>
+                    {(d.status === 'Pending' || d.status === 'Menunggu Validasi') && (
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button onClick={() => setGeneratedQr(d.id)} style={{ background: '#E0F2FE', color: '#0284C7', border: 'none', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s' }}
+                          onMouseEnter={e => e.target.style.background = '#BAE6FD'}
+                          onMouseLeave={e => e.target.style.background = '#E0F2FE'}
+                        >
+                          Lihat QR
+                        </button>
+                        <button onClick={() => {
+                          if(window.confirm('Hapus data transaksi ini?')) {
+                            onDeleteDeposit(d.id, d.status);
+                          }
+                        }} style={{ background: '#FEE2E2', color: '#EF4444', border: 'none', padding: 8, borderRadius: 8, cursor: 'pointer', display: 'inline-flex', transition: 'all 0.2s' }}
+                          onMouseEnter={e => e.target.style.background = '#FCA5A5'}
+                          onMouseLeave={e => e.target.style.background = '#FEE2E2'}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    )}
+                    {d.status === 'Ditolak' && (
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <button onClick={() => handleEdit(d)} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s' }}
+                          onMouseEnter={e => e.target.style.background = '#FEE2E2'}
+                          onMouseLeave={e => e.target.style.background = '#FEF2F2'}
+                        >
+                          Edit & Kirim Ulang
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+                {d.status === 'Ditolak' && d.remarks && (
+                  <tr style={{ background: i % 2 === 0 ? 'white' : '#FAFCFD', borderBottom: '1px solid rgba(203, 213, 225, 0.4)' }}>
+                    <td colSpan="7" style={{ padding: '0px 18px 14px 18px' }}>
+                      <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '10px 14px', borderRadius: 8, fontSize: '0.8rem', color: '#991B1B', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <Info size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <strong>Catatan Penolakan:</strong> {d.remarks}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {riwayatFilteredDeposits.length === 0 && (
               <tr>
@@ -962,7 +1036,7 @@ const renderBuktiBayar = () => (
         </main>
       </div>
 
-      {/* Pop-up Detail Kwitansi User */}
+      
 {activeKwitansiPopup && (
   <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease-out' }}>
     <div style={{ background: 'white', width: '100%', maxWidth: 440, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
@@ -974,7 +1048,7 @@ const renderBuktiBayar = () => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
         <div style={{ fontSize: '0.85rem' }}>No. Bukti: <strong>{activeKwitansiPopup.no_bukti}</strong></div>
         
-        {/* Kontainer Gambar dengan tombol Fullscreen & Download */}
+        
         <div style={{ position: 'relative', width: '100%', borderRadius: 12, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#F8FAFC' }}>
           <img 
             src={activeKwitansiPopup.img_url} 
@@ -1001,7 +1075,7 @@ const renderBuktiBayar = () => (
   </div>
 )}
 
-{/* Lightbox Fullscreen */}
+
 {fullImage && (
   <div onClick={() => setFullImage(null)} style={{ position: 'fixed', inset: 0, zIndex: 999, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
     <img src={fullImage} style={{ maxWidth: '95%', maxHeight: '95%', objectFit: 'contain' }} />
@@ -1107,15 +1181,16 @@ const renderBuktiBayar = () => (
             
             <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
               <button onClick={handleDownloadQR} style={{ flex: 1, padding: '12px', background: 'white', color: 'var(--ds-text)', border: '1.5px solid var(--ds-border)', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-                <Download size={18} /> Download
+                <Download size={18} /> Download QR
               </button>
-              <button onClick={handleShareQR} style={{ flex: 1, padding: '12px', background: 'white', color: 'var(--ds-text)', border: '1.5px solid var(--ds-border)', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-                <Share2 size={18} /> Share
+              <button onClick={handleShareLink} style={{ flex: 1, padding: '12px', background: 'white', color: 'var(--ds-text)', border: '1.5px solid var(--ds-border)', borderRadius: '12px', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                <Share2 size={18} /> Share Link
               </button>
             </div>
 
+
             <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => { setGeneratedQr(null); setCurrentPage('riwayat'); }} style={{ flex: 1, padding: '14px', background: 'var(--ds-accent)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
+              <button onClick={() => { setGeneratedQr(null); setLinkCopied(false); setCurrentPage('riwayat'); }} style={{ flex: 1, padding: '14px', background: 'var(--ds-accent)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' }}
                 onMouseEnter={e => e.target.style.background = 'var(--ds-accent-light)'}
                 onMouseLeave={e => e.target.style.background = 'var(--ds-accent)'}
               >Selesai</button>

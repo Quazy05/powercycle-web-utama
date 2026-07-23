@@ -41,14 +41,10 @@ export default function UserPage() {
 
         let allDeposits = [];
         if (dataDep.success) allDeposits = [...allDeposits, ...dataDep.deposits];
-        if (dataTemp.success) allDeposits = [...allDeposits, ...dataTemp.deposits];
-        
-        // Deduplicate deposits by id to prevent duplicate React key console errors
+        if (dataTemp.success) allDeposits = [...allDeposits, ...dataTemp.deposits];
         const uniqueMap = new Map();
         allDeposits.forEach(d => { if (d && d.id) uniqueMap.set(d.id, d); });
-        allDeposits = Array.from(uniqueMap.values());
-
-        // Sort combined deposits by date and time descending
+        allDeposits = Array.from(uniqueMap.values());
         allDeposits.sort((a, b) => {
           const dateA = new Date(`${a.date}T${a.time}`);
           const dateB = new Date(`${b.date}T${b.time}`);
@@ -68,9 +64,7 @@ export default function UserPage() {
     }
 
     fetchData();
-  }, [role, username, unit, router]);
-
-  // Cron Sync otomatis di background
+  }, [role, username, unit, router]);
   useEffect(() => {
     if (role !== 'user') return;
     const syncInterval = parseInt(process.env.NEXT_PUBLIC_SYNC_INTERVAL || '60000', 10);
@@ -141,9 +135,26 @@ export default function UserPage() {
   };
 
   const handleUpdateDeposit = async (id, updatedData) => {
-    console.warn('Update deposit not fully implemented on server.');
-    alert('Fitur update belum tersedia.');
-    return { success: false };
+    try {
+      const res = await fetch(`/api/resubmit/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeposits(prev => prev.map(d => 
+          d.id === id ? { ...d, ...updatedData, status: 'Menunggu Validasi', remarks: '' } : d
+        ));
+        return { success: true };
+      } else {
+        alert('Gagal mengirim ulang data: ' + data.error);
+        return { success: false };
+      }
+    } catch (err) {
+      console.error('Update deposit error:', err);
+      return { success: false };
+    }
   };
 
   const handleAddBuktiBayar = async (bukti) => {
