@@ -183,9 +183,28 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     return DAFTAR_PENGELOLA;
   }, [masterPengelola]);
 
-  const myDeposits = useMemo(() => deposits.filter(d => d.user === username), [deposits, username]);
-  const unitBuktiBayar = useMemo(() => buktiBayar.filter(b => !userUnit || b.unit === userUnit), [buktiBayar, userUnit]);
+  // 1. Filter setoran sampah milik user & merunut berdasarkan unit
+  const myDeposits = useMemo(() => {
+    return deposits.filter(d => 
+      d.user === username && 
+      (!userUnit || d.unit === userUnit)
+    );
+  }, [deposits, username, userUnit]);
 
+  // 2. Filter Bukti Bayar khusus untuk unit user
+  const unitBuktiBayar = useMemo(() => {
+    return buktiBayar.filter(b => !userUnit || b.unit === userUnit);
+  }, [buktiBayar, userUnit]);
+
+  // 3. Filter Neraca Sampah (CUKUP TULIS 1 KALI SAJA DI SINI)
+  const filteredNeraca = useMemo(() => {
+    return neraca.filter(n => 
+      n.month === selectedBulan && 
+      (!userUnit || n.unit === userUnit)
+    );
+  }, [neraca, selectedBulan, userUnit]);
+
+  // 4. Filter berdasarkan rentang waktu
   const dashboardFilteredDeposits = useMemo(() => {
     return filterDataBerdasarkanWaktu(myDeposits, dashboardFilter);
   }, [myDeposits, dashboardFilter]);
@@ -214,10 +233,6 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     return 'akumulasi keseluruhan';
   }, [dashboardFilter]);
 
-  const filteredNeraca = useMemo(() => {
-    return neraca.filter(n => n.month === selectedBulan && (!userUnit || n.unit === userUnit));
-  }, [neraca, selectedBulan, userUnit]);
-
   const handleInputSubmit = (e) => {
     e.preventDefault();
     if (!formData.berat || !formData.pengelola || !formData.jenis) {
@@ -233,7 +248,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     const svgData = new XMLSerializer().serializeToString(svg);
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const img = new Image();
+    const img = new Image();
+
     canvas.width = 240;
     canvas.height = 240;
     
@@ -301,7 +317,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
       await navigator.clipboard.writeText(url);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
+    } catch {
+
       const textArea = document.createElement('textarea');
       textArea.value = url;
       document.body.appendChild(textArea);
@@ -325,10 +342,12 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
       } catch (error) {
         console.error('Error sharing link:', error);
       }
-    } else {
+    } else {
+
       handleCopyLink();
     }
-  };
+  };
+
   const handleEdit = (deposit) => {
     setEditingId(deposit.id);
     setFormData({
@@ -350,7 +369,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
       status: 'Menunggu Validasi'
     };
 
-    if (editingId) {
+    if (editingId) {
+
       await onUpdateDeposit(editingId, depData); 
       setEditingId(null);
       setFormData({ date: TODAY, time: new Date().toTimeString().slice(0, 5), kategori: 'Organik', jenis: '', pengelola: '', berat: '' });
@@ -362,7 +382,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
       }
     }
     setShowConfirmPopup(false);
-  };
+  };
+
   const handleUploadKwitansiPerBulan = (e, bulanId) => {
     const file = e.target.files[0];
     if (file) {
@@ -384,7 +405,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
 
   const handleDeleteBukti = async (id) => {
   try {
-    const res = await fetch(`/api/bukti/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/bukti/${id}`, { method: 'DELETE' });
+
     if (!res.ok) {
        const errData = await res.json().catch(() => ({ error: 'Unknown Error' }));
        throw new Error(errData.error || 'Gagal menghapus');
@@ -944,8 +966,7 @@ const renderBuktiBayar = () => (
             position: 'fixed',
             inset: 0,
             background: 'rgba(12, 26, 46, 0.4)',
-            zIndex: 45,
-            backdropFilter: 'blur(4px)'
+            zIndex: 45
           }}
         />
       )}

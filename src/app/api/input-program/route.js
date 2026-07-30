@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '../../lib/db';
 
-export async function GET() {
+export async function GET(request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const unit = searchParams.get('unit'); // Tangkap parameter unit dari URL
+
     const db = await getDbConnection();
-    const [rows] = await db.query('SELECT * FROM input_program ORDER BY id DESC');
+    let query = 'SELECT * FROM input_program';
+    let queryParams = [];
+
+    // Filter berdasarkan unit jika parameter unit dikirim dan bukan 'Semua Unit' / 'all'
+    if (unit && unit !== 'Semua Unit' && unit !== 'all') {
+      query += ' WHERE unit = ?';
+      queryParams.push(unit);
+    }
+
+    query += ' ORDER BY id DESC';
+
+    const [rows] = await db.query(query, queryParams);
     
     const parsedRows = rows.map(row => ({
       ...row,

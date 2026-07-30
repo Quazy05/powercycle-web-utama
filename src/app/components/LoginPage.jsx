@@ -1,9 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { Building2, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { UNIT_LIST } from '../lib/mockData';
 
 const PLNLogo = ({ size = 64 }) => {
   const customLogoUrl = '/Logo.png';
@@ -23,6 +22,30 @@ export default function LoginPage() {
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [determinedRole, setDeterminedRole] = useState('user');
 
+  // State untuk menyimpan daftar unit dinamis dari database
+  const [unitList, setUnitList] = useState([]);
+  const [loadingUnits, setLoadingUnits] = useState(false);
+
+  // Fungsi untuk memuat data unit terbaru dari database
+  const fetchUnits = async () => {
+    setLoadingUnits(true);
+    try {
+      const res = await fetch('/api/master/unit'); 
+      if (!res.ok) {
+        console.error(`Gagal memuat API unit. Status: ${res.status}`);
+        return;
+      }
+      const result = await res.json();
+      if (result.success && Array.isArray(result.data)) {
+        setUnitList(result.data);
+      }
+    } catch (err) {
+      console.error('Error fetching units:', err);
+    } finally {
+      setLoadingUnits(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username || !password) {
@@ -41,6 +64,16 @@ export default function LoginPage() {
         const user = data.user;
         const role = user.role.toLowerCase();
         setDeterminedRole(role);
+        
+        // HANYA ADMIN SIS YANG LANGSUNG BYPASS / TANPA PILIH UNIT
+        if (role === 'admin sis') {
+          login(role, 'Pusat', username); // Default unit ke Pusat
+          router.push('/admin');
+          return;
+        }
+
+        // ADMIN LLK & USER REGULER TETAP HARUS PILIH UNIT
+        await fetchUnits();
         setShowUnitModal(true);
       } else {
         alert(data.error || 'Username atau password salah');
@@ -51,12 +84,25 @@ export default function LoginPage() {
     }
   };
 
-  const handleUnitSelect = (unit) => {
-    login(determinedRole, unit, username);
+  const handleUnitSelect = (unitName) => {
+    login(determinedRole, unitName, username);
     setShowUnitModal(false);
     
     if (determinedRole === 'admin sis' || determinedRole === 'admin llk') router.push('/admin');
     else if (determinedRole === 'user') router.push('/user');
+  };
+
+  // Helper untuk menentukan gambar kartu unit (Mengutamakan image_url dari DB)
+  const getUnitImage = (unit) => {
+    if (unit.image_url && unit.image_url.trim() !== '') {
+      return unit.image_url;
+    }
+
+    const name = (unit.nama_unit || '').toLowerCase();
+    if (name.includes('wonogiri')) return '/PLTA Wonogiri.jpeg';
+    if (name.includes('banjarnegara')) return '/PLTA PB. Soedirman.jpeg';
+
+    return '/Logo.png';
   };
 
   return (
@@ -200,56 +246,68 @@ export default function LoginPage() {
           animation: 'fadeIn 0.25s ease'
         }}>
           <div style={{
-            background: 'white', borderRadius: 'var(--ds-card-radius)', padding: '40px 36px', width: '100%', maxWidth: 440,
+            background: 'white', borderRadius: 'var(--ds-card-radius)', padding: '36px 28px', width: '100%', maxWidth: 520,
             boxShadow: '0 32px 80px -10px rgba(12, 26, 46, 0.15)', border: '1px solid rgba(203, 213, 225, 0.7)',
             boxSizing: 'border-box',
             animation: 'slideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1)'
           }}>
             <h2 style={{ margin: '0 0 8px 0', color: 'var(--ds-text)', fontSize: '1.45rem', fontWeight: 800, textAlign: 'center', letterSpacing: '-0.5px' }}>Pilih Unit Lokasi</h2>
-            <p style={{ color: 'var(--ds-text-muted)', fontSize: '0.88rem', textAlign: 'center', marginBottom: 28, marginTop: 0 }}>
+            <p style={{ color: 'var(--ds-text-muted)', fontSize: '0.88rem', textAlign: 'center', marginBottom: 24, marginTop: 0 }}>
               Silakan pilih unit operasional Anda untuk melanjutkan login
             </p>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              {UNIT_LIST.map(unit => (
-                <button
-                  key={unit}
-                  onClick={() => handleUnitSelect(unit)}
-                  style={{
-                    padding: '24px 16px', background: 'white', border: '1.5px solid var(--ds-border)',
-                    borderRadius: 20, cursor: 'pointer', transition: 'all 0.25s',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-                    fontFamily: 'inherit', boxSizing: 'border-box'
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ds-accent)'; e.currentTarget.style.background = 'rgba(8, 145, 178, 0.03)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ds-border)'; e.currentTarget.style.background = 'white'; e.currentTarget.style.transform = 'none'; }}
-                >
-                  <div style={{ 
-                    width: '100%', 
-                    height: 120, 
-                    borderRadius: 12, 
-                    overflow: 'hidden',
-                    marginBottom: 8,
-                    background: 'var(--ds-bg-alt)'
-                  }}>
-                    <img 
-                      src={unit === 'Wonogiri' ? '/PLTA Wonogiri.jpeg' : '/PLTA PB. Soedirman.jpeg'} 
-                      alt={unit}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                  </div>
-                  <span style={{ fontWeight: 700, color: 'var(--ds-text)', fontSize: '0.95rem', textAlign: 'center' }}>
-                    {unit === 'Wonogiri' ? 'PLTA Wonogiri' : (unit === 'Banjarnegara' ? 'PLTA PB.Soedirman' : unit)}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {loadingUnits ? (
+              <p style={{ textAlign: 'center', color: 'var(--ds-text-muted)', padding: '24px 0' }}>Memuat unit terbaru...</p>
+            ) : unitList.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--ds-text-muted)', padding: '24px 0' }}>Tidak ada unit yang tersedia.</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, maxHeight: '380px', overflowY: 'auto', paddingRight: 4 }}>
+                {unitList.map((unit) => (
+                  <button
+                    key={unit.id}
+                    onClick={() => handleUnitSelect(unit.nama_unit)}
+                    style={{
+                      padding: '16px 12px', background: 'white', border: '1.5px solid var(--ds-border)',
+                      borderRadius: 20, cursor: 'pointer', transition: 'all 0.25s',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                      fontFamily: 'inherit', boxSizing: 'border-box'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--ds-accent)'; e.currentTarget.style.background = 'rgba(8, 145, 178, 0.03)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--ds-border)'; e.currentTarget.style.background = 'white'; e.currentTarget.style.transform = 'none'; }}
+                  >
+                    <div style={{ 
+                      width: '100%', 
+                      height: 100, 
+                      borderRadius: 12, 
+                      overflow: 'hidden',
+                      background: 'var(--ds-bg-alt)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <img 
+                        src={getUnitImage(unit)} 
+                        alt={unit.nama_unit}
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover' 
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontWeight: 700, color: 'var(--ds-text)', fontSize: '0.9rem', textAlign: 'center' }}>
+                      {unit.nama_unit === 'Banjarnegara' ? 'PLTA PB.Soedirman' : (unit.nama_unit === 'Wonogiri' ? 'PLTA Wonogiri' : unit.nama_unit)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             
             <button 
               onClick={() => setShowUnitModal(false)}
               style={{
                 width: '100%', padding: '12px', background: 'transparent', color: 'var(--ds-text-muted)',
-                border: 'none', marginTop: 24, cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem',
+                border: 'none', marginTop: 20, cursor: 'pointer', fontWeight: 700, fontSize: '0.88rem',
                 fontFamily: 'inherit', display: 'block', textAlign: 'center'
               }}
               onMouseEnter={e => e.target.style.color = 'var(--ds-text)'}

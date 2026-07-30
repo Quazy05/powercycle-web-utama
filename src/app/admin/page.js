@@ -33,7 +33,7 @@ export default function AdminPage() {
         fetch('/api/neraca'),
         fetch('/api/bukti' + queryUnit),
         fetch('/api/inventarisasi'),
-        fetch('/api/rekap-program'),
+        fetch('/api/rekap-program' + queryUnit), // <-- Tambahkan queryUnit di sini agar ikut terfilter
         fetch('/api/users'),
         fetch('/api/clients')
       ]);

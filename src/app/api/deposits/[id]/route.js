@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db as firestore } from '../../../lib/firebase';
 import { getDbConnection } from '../../../lib/db';
 
 export async function DELETE(request, { params }) {
@@ -14,9 +16,17 @@ export async function DELETE(request, { params }) {
 
     const deposit = deposits[0];
 
-    // Delete deposit
+    // Delete deposit from MySQL
     await pool.query('DELETE FROM deposits WHERE id = ?', [id]);
 
+    // Delete deposit from Firebase Firestore instantly
+    try {
+      await deleteDoc(doc(firestore, 'deposits', id));
+    } catch (fbErr) {
+      console.warn('Failed to delete from Firebase:', fbErr.message);
+    }
+
+    // Update neraca jika sebelumnya terverifikasi
     if (deposit.status === 'Terverifikasi') {
       const month = deposit.date.substring(0, 7);
       await pool.query(
@@ -46,6 +56,7 @@ export async function PUT(request, { params }) {
 
     const current = deposits[0];
 
+    // Persiapkan data yang akan di-update
     const updatedData = {
       date: body.date !== undefined ? body.date : current.date,
       time: body.time !== undefined ? body.time : current.time,
@@ -54,16 +65,30 @@ export async function PUT(request, { params }) {
       pengelola: body.pengelola !== undefined ? body.pengelola : current.pengelola,
       weight: body.weight !== undefined ? body.weight : current.weight,
       status: body.status !== undefined ? body.status : current.status,
+      // Jika status ditolak dan ada remarks/alasan baru, gunakan itu. Jika disetujui, update info validator.
       remarks: body.remarks !== undefined ? body.remarks : current.remarks
     };
 
-    // Update deposit
+    // Update deposit di MySQL
     await pool.query(
       'UPDATE deposits SET date = ?, time = ?, category = ?, jenis = ?, pengelola = ?, weight = ?, status = ?, remarks = ? WHERE id = ?',
       [updatedData.date, updatedData.time, updatedData.category, updatedData.jenis, updatedData.pengelola, updatedData.weight, updatedData.status, updatedData.remarks, id]
     );
 
-    // Sync neraca_sampah
+    // Sync instan perubahan status / alasan ke Firebase Firestore
+    try {
+      const docRef = doc(firestore, 'deposits', id);
+      await setDoc(docRef, {
+        status: updatedData.status,
+        remarks: updatedData.remarks,
+        synced_to_mysql: true,
+        updated_at: new Date().toISOString()
+      }, { merge: true });
+    } catch (fbErr) {
+      console.warn('Failed to sync update to Firebase:', fbErr.message);
+    }
+
+    // Sync neraca_sampah berdasarkan perubahan status verifikasi
     if (current.status === 'Terverifikasi' && updatedData.status !== 'Terverifikasi') {
       const month = current.date.substring(0, 7);
       await pool.query(

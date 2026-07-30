@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Recycle, Leaf, Factory, TrendingUp, ArrowRight, BarChart3,
-  Users, Scale, ChevronDown, Menu, X, MapPin, Phone, Mail, ArrowUp, Navigation
+  Users, Scale, ChevronDown, Menu, X, MapPin, Phone, Mail, ArrowUp, Navigation, ExternalLink
 } from 'lucide-react';
 import {
   BarChart, Bar, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip,
@@ -44,19 +44,38 @@ const PLNLogo = ({ size = 64, unit = '' }) => {
   return null;
 };
 
-// Data lokasi untuk Map (Google Maps Embed - titik lokasi PLTA)
-const MAP_LOCATIONS = [
-  { id: 'Wonogiri', name: 'PLTA Wonogiri', embedUrl: 'https://maps.google.com/maps?q=PLTA+Wonogiri&z=15&output=embed' },
-  { id: 'Banjarnegara', name: 'PLTA PB.Soedirman', embedUrl: 'https://maps.google.com/maps?q=PLTA+Mrica+Banjarnegara&z=15&output=embed' }
-];
-
 export default function LandingPage({ initialDeposits = [], mockUsers = [], pemanfaatanData = [] }) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeUnit, setActiveUnit] = useState('all');
   const [showTopBtn, setShowTopBtn] = useState(false);
-  const [activeMapLoc, setActiveMapLoc] = useState(MAP_LOCATIONS[0]);
+
+  // State untuk Data Unit & Peta dari Database
+  const [dbUnits, setDbUnits] = useState([]);
+  const [activeMapLoc, setActiveMapLoc] = useState(null);
+  const [loadingMapUnits, setLoadingMapUnits] = useState(true);
+
+  // Fetch daftar unit dari database saat komponen dimuat
+  useEffect(() => {
+    const fetchMapUnits = async () => {
+      setLoadingMapUnits(true);
+      try {
+        const res = await fetch('/api/master/unit');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setDbUnits(json.data);
+          setActiveMapLoc(json.data[0]); // Default unit pertama
+        }
+      } catch (err) {
+        console.error("Gagal mengambil data unit peta:", err);
+      } finally {
+        setLoadingMapUnits(false);
+      }
+    };
+
+    fetchMapUnits();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -103,23 +122,28 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
     return { totalWeight, organikWeight, anorganikWeight, residuWeight, totalTransactions, totalUsers };
   }, [activeUnit, currentFilteredDeposits, mockUsers]);
 
-  const unitStats = useMemo(() => {
-    return UNIT_LIST.map(unit => {
-      const unitDeposits = initialDeposits.filter(d => d.unit === unit);
-      const totalWeight = unitDeposits.reduce((s, d) => s + (Number(d.weight) || 0), 0);
-      const totalTransactions = unitDeposits.length;
-      const nasabah = mockUsers.filter(u => u.unit === unit && u.role === 'User').length;
-      return { unit, totalWeight, totalTransactions, nasabah };
+  // Statistik per Unit untuk Panel Peta
+  const unitStatsMap = useMemo(() => {
+    const statsMap = {};
+    initialDeposits.forEach(d => {
+      const unitKey = d.unit || 'Lainnya';
+      if (!statsMap[unitKey]) {
+        statsMap[unitKey] = { totalWeight: 0, nasabahCount: 0 };
+      }
+      statsMap[unitKey].totalWeight += (Number(d.weight) || 0);
     });
-  }, [currentFilteredDeposits, activeUnit, mockUsers]);
 
-  const pemanfaatanStats = useMemo(() => {
-    return {
-      totalInput: pemanfaatanData.length,
-      totalPrograms: new Set(pemanfaatanData.map(d => d.program_name)).size,
-      totalUnits: new Set(pemanfaatanData.map(d => d.unit)).size
-    };
-  }, [pemanfaatanData]);
+    mockUsers.forEach(u => {
+      if (u.role === 'User' && u.unit) {
+        if (!statsMap[u.unit]) {
+          statsMap[u.unit] = { totalWeight: 0, nasabahCount: 0 };
+        }
+        statsMap[u.unit].nasabahCount += 1;
+      }
+    });
+
+    return statsMap;
+  }, [initialDeposits, mockUsers]);
 
   const pieData = [
     { name: 'Organik', value: +Number(stats.organikWeight).toFixed(1), color: '#10B981' },
@@ -132,6 +156,70 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Helper pembuat URL Google Maps Embed (Mendukung PARSING LINK LENGKAP)
+  const getMapEmbedUrl = (loc) => {
+    if (!loc) return 'https://maps.google.com/maps?q=PT.+PLN+Indonesia+Power+UBP+Mrica&z=17&output=embed';
+
+    // 1. Jika map_url tersedia di database
+    if (loc.map_url && loc.map_url.trim() !== '') {
+      const rawUrl = loc.map_url.trim();
+
+      // Ekstrak nama lokasi dari URL /place/
+      if (rawUrl.includes('/place/')) {
+        const matchPlace = rawUrl.match(/\/place\/([^/]+)/);
+        if (matchPlace && matchPlace[1]) {
+          const placeName = decodeURIComponent(matchPlace[1].replace(/\+/g, ' '));
+          return `https://maps.google.com/maps?q=${encodeURIComponent(placeName)}&z=17&output=embed`;
+        }
+      }
+
+      // Ekstrak dari URL koordinat /@latitude,longitude
+      if (rawUrl.includes('/@')) {
+        const matchCoords = rawUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (matchCoords && matchCoords[1] && matchCoords[2]) {
+          return `https://maps.google.com/maps?q=${matchCoords[1]},${matchCoords[2]}&z=17&output=embed`;
+        }
+      }
+
+      // Jika URL sudah mengandung output=embed
+      if (rawUrl.includes('output=embed')) {
+        return rawUrl;
+      }
+
+      return `https://maps.google.com/maps?q=${encodeURIComponent(rawUrl)}&z=17&output=embed`;
+    }
+
+    // 2. Fallback berdasarkan nama unit jika map_url di DB masih kosong
+    const name = (loc.nama_unit || '').toLowerCase();
+    if (name.includes('mrica') || name.includes('banjarnegara')) {
+      return 'https://maps.google.com/maps?q=PT.+PLN+Indonesia+Power+UBP+Mrica&z=17&output=embed';
+    }
+    if (name.includes('wonogiri')) {
+      return 'https://maps.google.com/maps?q=PLTA+Wonogiri&z=17&output=embed';
+    }
+    if (name.includes('jakarta')) {
+      return 'https://maps.google.com/maps?q=Jakarta+Indonesia&z=12&output=embed';
+    }
+
+    return `https://maps.google.com/maps?q=${encodeURIComponent(loc.nama_unit)}&z=15&output=embed`;
+  };
+
+  // Helper pembuat Link Google Maps eksternal
+  const getExternalMapUrl = (loc) => {
+    if (!loc) return 'https://www.google.com/maps/place/PT.+PLN+Indonesia+Power+UBP+Mrica/';
+
+    if (loc.map_url && loc.map_url.trim() !== '') {
+      return loc.map_url.trim();
+    }
+
+    const name = (loc.nama_unit || '').toLowerCase();
+    if (name.includes('mrica') || name.includes('banjarnegara')) {
+      return 'https://www.google.com/maps/place/PT.+PLN+Indonesia+Power+UBP+Mrica/';
+    }
+
+    return `https://www.google.com/maps/search/${encodeURIComponent(loc.nama_unit)}`;
   };
 
   return (
@@ -152,7 +240,7 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
             <a href="#hero" className="nav-link active">Beranda</a>
             <a href="#tentang" className="nav-link">Tentang</a>
             <a href="#statistik" className="nav-link">Statistik</a>
-            <a href="#unit" className="nav-link">Unit</a>
+            <a href="#peta" className="nav-link">Unit</a>
             <a href="#kontak" className="nav-link">Kontak</a>
           </nav>
 
@@ -172,7 +260,7 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
           <a href="#hero" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Beranda</a>
           <a href="#tentang" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Tentang</a>
           <a href="#statistik" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Statistik</a>
-          <a href="#unit" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Unit</a>
+          <a href="#peta" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Unit</a>
           <a href="#kontak" className="mobile-nav-link" onClick={() => setMobileMenuOpen(false)}>Kontak</a>
           <a href="/login" className="btn-login mobile">
             Masuk <ArrowRight size={16} />
@@ -232,7 +320,7 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
                   <span className="hero-stat-label">Transaksi</span>
                 </div>
                 <div className="hero-stat-item">
-                  <span className="hero-stat-value">{UNIT_LIST.length}</span>
+                  <span className="hero-stat-value">{dbUnits.length || UNIT_LIST.length}</span>
                   <span className="hero-stat-label">Unit Aktif</span>
                 </div>
               </div>
@@ -373,7 +461,7 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
                 <Recycle size={24} />
               </div>
               <div className="stat-info">
-                <span className="stat-value">{UNIT_LIST.length}</span>
+                <span className="stat-value">{dbUnits.length || UNIT_LIST.length}</span>
                 <span className="stat-label">Unit Operasional</span>
               </div>
             </div>
@@ -431,76 +519,103 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
         </div>
       </section>
 
-      {/* INTERACTIVE GOOGLE MAPS SECTION */}
-      <section id="peta" style={{ padding: '120px 24px', background: 'var(--ds-bg)' }}>
+      {/* SECTION PETA INTERAKTIF PENGGUNAAN GOOGLE MAPS DATABASE */}
+      <section id="peta" style={{ padding: '100px 24px', background: 'var(--ds-bg)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: 60 }}>
-            <span className="glass-badge" style={{ display: 'inline-block', padding: '8px 20px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 700, marginBottom: 20, textTransform: 'uppercase', letterSpacing: 1.5 }}>Sebaran Lokasi</span>
-            <h2 style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--ds-text)', marginBottom: 24, letterSpacing: '-1px' }}>Peta <span style={{ color: 'var(--ds-accent)' }}>Unit PLN</span></h2>
+          <div style={{ textAlign: 'center', marginBottom: 50 }}>
+            <span className="glass-badge" style={{ display: 'inline-block', padding: '8px 20px', borderRadius: '999px', fontSize: '0.85rem', fontWeight: 700, marginBottom: 16, textTransform: 'uppercase', letterSpacing: 1.5, background: 'rgba(8, 145, 178, 0.08)', color: 'var(--ds-accent)' }}>Sebaran Lokasi</span>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--ds-text)', marginBottom: 12, letterSpacing: '-1px' }}>Peta <span style={{ color: 'var(--ds-accent)' }}>Unit PLN</span></h2>
+            <p style={{ color: 'var(--ds-text-muted)', fontSize: '0.95rem', margin: 0 }}>Pilih salah satu unit di bawah ini untuk menampilkan lokasi peta Google Maps secara real-time.</p>
           </div>
 
-          <div className="map-section-layout">
-            {/* LEFT: Unit Selection Panel */}
-            <div className="map-sidebar">
-              <div className="glass-panel" style={{ borderRadius: '1.5rem', padding: '28px', height: '100%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Navigation size={22} color="var(--ds-accent)" /> Unit Operasional
-                </h3>
-                <p style={{ fontSize: '0.9rem', color: 'var(--ds-text-muted)', margin: 0, lineHeight: 1.6 }}>Pilih unit di bawah ini untuk mengarahkan peta ke lokasi tersebut.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 360px) 1fr', gap: 24, alignItems: 'stretch' }} className="map-layout-grid">
+            
+            {/* KIRI: Daftar Unit dari Database */}
+            <div className="glass-panel" style={{ borderRadius: '1.5rem', padding: '24px', background: 'white', border: '1px solid var(--ds-border)', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Navigation size={20} color="var(--ds-accent)" /> Unit Operasional
+              </h3>
+              
+              {loadingMapUnits ? (
+                <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Memuat lokasi unit...</div>
+              ) : dbUnits.length === 0 ? (
+                <div style={{ padding: '30px 0', textAlign: 'center', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>Belum ada data unit.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', maxHeight: '420px', paddingRight: 4 }}>
+                  {dbUnits.map((loc) => {
+                    const unitName = loc.nama_unit;
+                    const statsForLoc = unitStatsMap[unitName] || { totalWeight: 0, nasabahCount: 0 };
+                    const isActive = activeMapLoc?.id === loc.id;
+                    const displayName = unitName === 'Banjarnegara' ? 'PLTA PB.Soedirman' : (unitName === 'Wonogiri' ? 'PLTA Wonogiri' : unitName);
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                  {MAP_LOCATIONS.map((loc) => {
-                    const statsForLoc = unitStats.find(u => u.unit === loc.id);
-                    const isActive = activeMapLoc.id === loc.id;
                     return (
                       <div
                         key={loc.id}
-                        className="map-loc-card"
                         onClick={() => setActiveMapLoc(loc)}
                         style={{
-                          background: isActive ? 'var(--ds-accent)' : 'rgba(255,255,255,0.6)',
+                          padding: '16px',
+                          borderRadius: '16px',
+                          cursor: 'pointer',
+                          transition: 'all 0.25s ease',
+                          background: isActive ? 'var(--ds-accent)' : '#FAFCFD',
                           color: isActive ? 'white' : 'var(--ds-text)',
-                          border: isActive ? '1px solid var(--ds-accent)' : '1px solid rgba(255,255,255,0.9)',
-                          boxShadow: isActive ? '0 8px 24px rgba(8,145,178,0.4)' : '0 4px 12px rgba(0,0,0,0.05)',
-                          transform: isActive ? 'scale(1.02)' : 'scale(1)'
+                          border: isActive ? '1px solid var(--ds-accent)' : '1px solid var(--ds-border)',
+                          boxShadow: isActive ? '0 8px 24px rgba(8,145,178,0.3)' : 'none',
                         }}
                       >
-                        <div style={{ fontWeight: 800, fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '10px' }}>
-                          <MapPin size={18} color={isActive ? 'white' : 'var(--ds-accent)'} /> {loc.name}
+                        <div style={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 8, marginBottom: '8px' }}>
+                          <MapPin size={18} color={isActive ? 'white' : 'var(--ds-accent)'} /> {displayName}
                         </div>
 
-                        {statsForLoc && (
-                          <div style={{ display: 'flex', gap: '20px', borderTop: isActive ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.08)', paddingTop: '10px' }}>
-                            <div>
-                              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, opacity: isActive ? 0.8 : 0.6 }}>Terkelola</div>
-                              <div style={{ fontSize: '1rem', fontWeight: 800 }}>{formatWeightTon(statsForLoc.totalWeight)}</div>
-                            </div>
-                            <div>
-                              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 700, opacity: isActive ? 0.8 : 0.6 }}>Nasabah</div>
-                              <div style={{ fontSize: '1rem', fontWeight: 800 }}>{statsForLoc.nasabah}</div>
-                            </div>
+                        <div style={{ display: 'flex', gap: '20px', borderTop: isActive ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(203,213,225,0.5)', paddingTop: '8px' }}>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, opacity: isActive ? 0.85 : 0.6 }}>Terkelola</div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{formatWeightTon(statsForLoc.totalWeight)}</div>
                           </div>
-                        )}
+                          <div>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', fontWeight: 700, opacity: isActive ? 0.85 : 0.6 }}>Nasabah</div>
+                            <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>{statsForLoc.nasabahCount}</div>
+                          </div>
+                        </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* RIGHT: Google Map (larger) */}
-            <div className="map-iframe-wrapper clay-card">
+            {/* KANAN: Iframe Google Maps */}
+            <div style={{ position: 'relative', borderRadius: '1.5rem', overflow: 'hidden', border: '1px solid var(--ds-border)', minHeight: '440px', background: '#F8FAFC', boxShadow: '0 10px 30px rgba(0,0,0,0.03)' }}>
+              {activeMapLoc && (
+                <a
+                  href={getExternalMapUrl(activeMapLoc)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    position: 'absolute', top: 16, left: 16, zIndex: 10,
+                    background: 'white', padding: '8px 16px', borderRadius: 10,
+                    textDecoration: 'none', color: 'var(--ds-text)', fontWeight: 700,
+                    fontSize: '0.85rem', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                    display: 'inline-flex', alignItems: 'center', gap: 6
+                  }}
+                >
+                  Buka di Maps <ExternalLink size={14} />
+                </a>
+              )}
+
               <iframe
-                src={activeMapLoc.embedUrl}
+                key={activeMapLoc?.id || 'default-map'}
+                src={getMapEmbedUrl(activeMapLoc)}
                 width="100%"
                 height="100%"
-                style={{ border: 0, borderRadius: '1.5rem' }}
+                style={{ border: 0, minHeight: '440px', display: 'block' }}
                 allowFullScreen=""
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                title={`Peta Lokasi ${activeMapLoc.name}`}
+                title={`Peta Lokasi ${activeMapLoc?.nama_unit || 'Unit PLN'}`}
               />
             </div>
+
           </div>
         </div>
       </section>
@@ -551,7 +666,7 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
                 <li><a href="#hero">Beranda</a></li>
                 <li><a href="#tentang">Tentang</a></li>
                 <li><a href="#statistik">Statistik</a></li>
-                <li><a href="#unit">Unit</a></li>
+                <li><a href="#peta">Unit</a></li>
               </ul>
             </div>
 
@@ -591,6 +706,14 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
       >
         <ArrowUp size={20} />
       </button>
+
+      <style jsx>{`
+        @media (max-width: 900px) {
+          .map-layout-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

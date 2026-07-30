@@ -4,9 +4,11 @@ import { getDbConnection } from '../../lib/db';
 export async function GET(request) {
   try {
     const pool = await getDbConnection();
-    const [users] = await pool.query('SELECT * FROM users ORDER BY name ASC');
-    return NextResponse.json({ success: true, Users });
+    const [users] = await pool.query('SELECT id, name, email, role, unit, joinDate, status FROM users ORDER BY name ASC');
+    
+    // Perbaikan: gunakan key 'data' dan variabel 'users' (huruf kecil)
+    return NextResponse.json({ success: true, data: users });
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch users', details: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to fetch users', details: error.message }, { status: 500 });
   }
 }

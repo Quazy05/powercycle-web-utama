@@ -49,7 +49,7 @@ export async function GET() {
       if (existing.length === 0) {
         await pool.query(
           `INSERT INTO deposits (id, date, time, user, client, unit, category, jenis, pengelola, weight, status, remarks) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             data.id || id,
             data.date || '',
@@ -69,8 +69,8 @@ export async function GET() {
         const month = (data.date || '').substring(0, 7);
         await pool.query(
           `INSERT INTO neraca_sampah (month, unit, category, jenis, timbulan, dimanfaatkan)
-           VALUES (?, ?, ?, ?, ?, 0)
-           ON DUPLICATE KEY UPDATE timbulan = timbulan + VALUES(timbulan)`,
+            VALUES (?, ?, ?, ?, ?, 0)
+            ON DUPLICATE KEY UPDATE timbulan = timbulan + VALUES(timbulan)`,
           [
             month,
             data.unit || 'Pusat',
@@ -95,6 +95,20 @@ export async function GET() {
     await pool.query(`DELETE td FROM temporary_deposits td INNER JOIN deposits d ON td.id = d.id`);
 
     const details = `Pushed ${pushCount} temporary deposits. Pulled ${pullCount} verified deposits.`;
+
+    // Otomatis buat tabel sync_log jika belum ada di database MySQL
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS sync_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sync_type VARCHAR(50) NOT NULL,
+        records_count INT DEFAULT 0,
+        status VARCHAR(20) NOT NULL,
+        details TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+
+    // Catat log sukses
     await pool.query(
       'INSERT INTO sync_log (sync_type, records_count, status, details) VALUES (?, ?, ?, ?)',
       ['CRON_SYNC', pushCount + pullCount, 'SUCCESS', details]
@@ -104,6 +118,18 @@ export async function GET() {
   } catch (error) {
     console.error('Cron sync error:', error);
     try {
+      // Pastikan tabel sync_log juga ada saat mencatat error
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS sync_log (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          sync_type VARCHAR(50) NOT NULL,
+          records_count INT DEFAULT 0,
+          status VARCHAR(20) NOT NULL,
+          details TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+      `).catch(() => {});
+
       await query(
         'INSERT INTO sync_log (sync_type, records_count, status, details) VALUES (?, ?, ?, ?)',
         ['CRON_SYNC', 0, 'FAILED', error.message]

@@ -3,7 +3,8 @@ import {
   LayoutDashboard, Trash2, Users, Building2, FileText,
   BarChart2, Activity, Settings, LogOut, Menu,
   Search, Package, Scale, ChevronLeft, ChevronRight,
-  Database, FileCheck, CheckCircle, Leaf, Recycle, Eye, Upload, Download, Maximize2, X
+  Database, FileCheck, CheckCircle, Leaf, Recycle, Eye, Upload, Download, Maximize2, X,
+  RefreshCw, UserCheck, UserPlus
 } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
@@ -131,7 +132,7 @@ function StatCard({ title, value, icon: Icon, color, bg }) {
 
 const ITEMS_PER_PAGE = 10;
 
-export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit }) {
+export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = [], inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,7 +154,6 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
   const [error, setError] = useState(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [notification, setNotification] = useState(null);
 
   const [deleteTarget, setDeleteTarget] = useState(null); 
   const [rejectTarget, setRejectTarget] = useState(null); 
@@ -162,8 +162,47 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
   const [programsData, setProgramsData] = useState([]);
   const [inputProgramsData, setInputProgramsData] = useState([]);
 
+  // --- STATE DATA USER UNTUK ADMIN SIS ---
+  const [userSourceTab, setUserSourceTab] = useState('mysql');
+  const [mysqlUsers, setMysqlUsers] = useState([]);
+  const [firebaseUsers, setFirebaseUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    name: '', email: '', password: '', role: 'User', unit: 'Wonogiri', status: 'Aktif'
+  });
+
+  const fetchUsersData = async () => {
+    setLoadingUsers(true);
+    try {
+      const [resMysql, resFirebase] = await Promise.all([
+        fetch('/api/users/mysql')
+          .then(async res => res.ok ? await res.json() : null)
+          .catch(async () => fetch('/api/users').then(res => res.ok ? res.json() : null).catch(() => null)),
+        fetch('/api/users/firebase')
+          .then(async res => res.ok ? await res.json() : null)
+          .catch(() => null)
+      ]);
+
+      if (resMysql && resMysql.success && Array.isArray(resMysql.data)) {
+        setMysqlUsers(resMysql.data);
+      } else if (Array.isArray(users) && users.length > 0) {
+        setMysqlUsers(users);
+      }
+
+      if (resFirebase && resFirebase.success && Array.isArray(resFirebase.data)) {
+        setFirebaseUsers(resFirebase.data);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data user:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
   useEffect(() => {
-    if (role === 'admin llk' || role === 'admin sis' || !role) { // Fetch for all admins just in case, but particularly for llk
+    if (role === 'admin llk' || role === 'admin sis' || !role) { 
       fetch('/api/programs').then(res => res.json()).then(data => {
         if (data.success) setProgramsData(data.data);
       }).catch(console.error);
@@ -171,20 +210,49 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
         if (data.success) setInputProgramsData(data.data);
       }).catch(console.error);
     }
-  }, [role]);
+
+    if (role === 'admin sis') {
+      fetchUsersData();
+    }
+  }, [role, userSourceTab]);
 
   useEffect(() => {
     setSelectedRow(null);
-  }, [currentPage, tablePage, dateFilter, categoryFilter, searchQuery, selectedBulan, selectedTahunHistoris]);
+  }, [currentPage, tablePage, dateFilter, categoryFilter, searchQuery, selectedBulan, selectedTahunHistoris, userSourceTab]);
 
   const [editingItem, setEditingItem] = useState(null);
   const [editFormType, setEditFormType] = useState('');
   const [editFormData, setEditFormData] = useState({});
 
   const handleEdit = (item, type) => {
-    setEditingItem(item.id);
+    setEditingItem(item.id || item.uid);
     setEditFormType(type);
     setEditFormData(item);
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      const endpoint = userSourceTab === 'mysql' ? '/api/users/mysql' : '/api/users/firebase';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUserForm)
+      });
+
+      const resData = await res.json();
+
+      if (res.ok && resData.success) {
+        alert('Pengguna berhasil ditambahkan!');
+        setShowAddUserModal(false);
+        setNewUserForm({ name: '', email: '', password: '', role: 'User', unit: 'Wonogiri', status: 'Aktif' });
+        fetchUsersData();
+      } else {
+        alert(`Gagal menambahkan pengguna: ${resData.error || resData.message || 'Terjadi kesalahan'}`);
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan koneksi server.');
+    }
   };
 
   const handleEditSubmit = async (e) => {
@@ -196,6 +264,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
       if (editFormType === 'neraca') endpoint = `/api/neraca/${editingItem}`;
       if (editFormType === 'inventarisasi') endpoint = `/api/inventarisasi/${editingItem}`;
       if (editFormType === 'rekap') endpoint = `/api/rekap-program/${editingItem}`;
+      if (editFormType === 'user-mysql') endpoint = `/api/users/mysql/${editingItem}`;
 
       const res = await fetch(endpoint, {
         method: 'PUT',
@@ -204,8 +273,10 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
       });
       
       if (res.ok) {
-        alert('Data berhasil diperbarui. Halaman akan dimuat ulang.');
-        window.location.reload();
+        alert('Data berhasil diperbarui.');
+        if (editFormType === 'user-mysql') fetchUsersData();
+        else window.location.reload();
+        setEditingItem(null);
       } else {
         alert('Gagal memperbarui data.');
       }
@@ -223,11 +294,14 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
       if (type === 'neraca') endpoint = `/api/neraca/${id}`;
       if (type === 'inventarisasi') endpoint = `/api/inventarisasi/${id}`;
       if (type === 'rekap') endpoint = `/api/rekap-program/${id}`;
+      if (type === 'user-mysql') endpoint = `/api/users/mysql/${id}`;
+      if (type === 'user-firebase') endpoint = `/api/users/firebase/${id}`;
 
       const res = await fetch(endpoint, { method: 'DELETE' });
       if (res.ok) {
-        alert('Data berhasil dihapus. Halaman akan dimuat ulang.');
-        window.location.reload();
+        alert('Data berhasil dihapus.');
+        if (type.startsWith('user-')) fetchUsersData();
+        else window.location.reload();
       } else {
         alert('Gagal menghapus data.');
       }
@@ -280,7 +354,11 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
   const filteredDeposits = useMemo(() => {
     return unitDeposits.filter(d => {
       const q = searchQuery.toLowerCase();
-      if (q && !d.pengelola.toLowerCase().includes(q)) return false;
+      if (q && !(
+        (d.pengelola || '').toLowerCase().includes(q) ||
+        (d.user || '').toLowerCase().includes(q) ||
+        (d.jenis || '').toLowerCase().includes(q)
+      )) return false;
       if (dateFilter && d.date !== dateFilter) return false;
       if (categoryFilter && d.category !== categoryFilter) return false;
       return true;
@@ -297,8 +375,8 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
 
   const sidebarItems = role === 'admin sis' ? [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'data-user-db', label: 'Data Pengguna', icon: UserCheck },
     { id: 'manajemen-program', label: 'Manajemen Program', icon: FileText },
-    { id: 'pengelola-data', label: 'Manajemen Pengguna & Unit', icon: Users },
     { id: 'master-data', label: 'Data Master', icon: Settings },
   ] : [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -313,7 +391,6 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
 
   const pageTitles = {
     dashboard: 'Dashboard', 'waste-monitoring': 'Monitoring Sampah',
-    'pengelola-data': 'Manajemen Pengguna & Unit',
     'master-data': 'Manajemen Data Master',
     'manajemen-program': 'Manajemen Program Pemanfaatan',
     'data-pemanfaatan': 'Data Input Pemanfaatan (User)',
@@ -321,12 +398,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
     'bukti-bayar': 'Bukti Bayar',
     inventarisasi: 'Inventarisasi Sampah Historis (2021-2026)',
     'rekap-program': 'Rekapitulasi Program Pengelolaan Sampah',
-  };
-
-  const navigateTo = (page) => {
-    setCurrentPage(page);
-    setSidebarOpen(false);
-    setTablePage(1);
+    'data-user-db': 'Kelola Data User',
   };
 
   const Pagination = ({ page, total, onChange, totalItems }) => (
@@ -416,18 +488,19 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
             <thead>
               <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 <th style={{ padding: '14px 18px', fontWeight: 700 }}>Tanggal</th>
-                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Pengguna</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Penginput (User)</th>
                 <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kategori</th>
                 <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis</th>
                 <th style={{ padding: '14px 18px', fontWeight: 700 }}>Berat</th>
                 <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Validasi / Keterangan</th>
               </tr>
             </thead>
             <tbody>
               {unitDeposits.slice(0, 5).map((d, i) => (
                 <tr key={`${d.id}-${i}`} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
                   <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date}</td>
-                  <td style={{ padding: '14px 18px', fontWeight: 600, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.user}</td>
+                  <td style={{ padding: '14px 18px', fontWeight: 700, fontSize: '0.85rem', color: '#0369A1' }}>{d.user || '-'}</td>
                   <td style={{ padding: '14px 18px' }}>
                     <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
                       {d.category}
@@ -436,6 +509,15 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
                   <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.jenis}</td>
                   <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{Number(d.weight).toFixed(1)} Kg</td>
                   <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
+                  <td style={{ padding: '14px 18px', fontSize: '0.8rem', color: d.status === 'Ditolak' ? '#B91C1C' : 'var(--ds-text-muted)' }}>
+                    {d.status === 'Ditolak' ? (
+                      <span style={{ background: '#FEF2F2', padding: '4px 8px', borderRadius: 6, border: '1px solid #FECACA', fontWeight: 600 }}>
+                        Alasan: {d.remarks || d.reject_reason || 'Data tidak sesuai'}
+                      </span>
+                    ) : (
+                      d.remarks || (d.validated_by ? `Divalidasi oleh: ${d.validated_by}` : '-')
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -451,7 +533,7 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: 240 }}>
             <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ds-text-muted)' }} />
-            <input type="text" placeholder="Cari klien..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
+            <input type="text" placeholder="Cari Klien, User Penginput, Jenis..." value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setTablePage(1); }}
               style={{ width: '100%', padding: '11px 14px 11px 40px', border: '1.5px solid var(--ds-border)', borderRadius: 12, fontSize: '0.875rem', outline: 'none', fontFamily: 'inherit', color: 'var(--ds-text)' }} />
           </div>
           <input type="date" value={dateFilter} onChange={e => { setDateFilter(e.target.value); setTablePage(1); }}
@@ -466,31 +548,34 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
-
+        <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem' }}>Edit</button>
+        <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'deposit')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem' }}>Hapus</button>
       </div>
+
       <div style={{ overflowX: 'auto', minHeight: 400 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               <th style={{ padding: '14px 18px', width: 40 }}></th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Tanggal/Waktu</th>
+              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Penginput (User)</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Unit</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kategori</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Pengelola</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Berat</th>
               <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
+              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Keterangan / Validator</th>
             </tr>
           </thead>
           <tbody>
             {paginatedDeposits.map((d, i) => (
-              <tr key={`${d.id}-${i}`} onClick={() => setSelectedRow(selectedRow?.id === d.id ? null : d)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === d.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer', transition: 'background 0.2s' }}>
+              <tr key={`${d.id}-${i}`} onClick={() => setSelectedRow(selectedRow?.id === d.id ? null : d)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === d.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer' }}>
                 <td style={{ padding: '14px 18px' }}>
                   <input type="radio" checked={selectedRow?.id === d.id} onChange={() => setSelectedRow(d)} style={{ cursor: 'pointer' }} />
                 </td>
                 <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.date} <span style={{ color: 'var(--ds-text-muted)', fontSize: '0.8rem' }}>{d.time}</span></td>
+                <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: '#0369A1' }}>{d.user || '-'}</td>
                 <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.unit}</td>
                 <td style={{ padding: '14px 18px' }}>
                   <span style={{ background: d.category === 'Organik' ? 'rgba(16, 185, 129, 0.08)' : d.category === 'Anorganik' ? 'rgba(8, 145, 178, 0.08)' : 'rgba(245, 158, 11, 0.08)', color: d.category === 'Organik' ? '#047857' : d.category === 'Anorganik' ? '#0891B2' : '#b45309', padding: '4px 10px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -501,6 +586,17 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
                 <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{d.pengelola}</td>
                 <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>{Number(d.weight).toFixed(1)} Kg</td>
                 <td style={{ padding: '14px 18px' }}><StatusBadge status={d.status} /></td>
+                <td style={{ padding: '14px 18px', fontSize: '0.8rem' }}>
+                  {d.status === 'Ditolak' ? (
+                    <span style={{ color: '#B91C1C', background: '#FEF2F2', padding: '4px 8px', borderRadius: 6, border: '1px solid #FECACA', fontWeight: 600 }}>
+                      Alasan: {d.remarks || d.reject_reason || 'Data tidak valid'}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--ds-text-muted)' }}>
+                      {d.remarks || (d.validated_by ? `Divalidasi oleh: ${d.validated_by}` : '-')}
+                    </span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -513,7 +609,6 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
   const renderLaporan = () => {
     const filteredLaporanDeposits = filterDataBerdasarkanWaktu(unitDeposits, laporanFilter);
 
-    // Hitung statistik untuk dashboard
     const grouped = filteredLaporanDeposits.reduce((acc, d) => {
       if (!acc[d.pengelola]) acc[d.pengelola] = { total: 0, count: 0, Organik: 0, Anorganik: 0, Residu: 0 };
       acc[d.pengelola].total += (Number(d.weight) || 0);
@@ -543,254 +638,241 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
     const subtextLabel = laporanFilter === 'hari' ? 'Hari Ini' : laporanFilter === 'minggu' ? 'Minggu Ini' : laporanFilter === 'bulan' ? 'Bulan Ini' : 'Semua';
 
     const handleExportExcel = async () => {
-    if (unitDeposits.length === 0) return alert('Tidak ada data.');
-    
-    const NAMA_BULAN_INDO = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    const sheetsData = {};
+      if (unitDeposits.length === 0) return alert('Tidak ada data.');
+      
+      const NAMA_BULAN_INDO = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      const sheetsData = {};
 
-    // Ringkasan Laporan
-    const ringkasanBulanan = unitDeposits.reduce((acc, d) => {
-      const date = new Date(d.date);
-      if (isNaN(date.getTime())) return acc;
-      const bulanTahun = `${NAMA_BULAN_INDO[date.getMonth()]} ${date.getFullYear()}`;
-      if (!acc[bulanTahun]) acc[bulanTahun] = { sortKey: date.getFullYear() * 100 + date.getMonth(), Organik: 0, Anorganik: 0, Residu: 0, Unit: new Set() };
-      acc[bulanTahun][d.category] = (acc[bulanTahun][d.category] || 0) + (Number(d.weight) || 0);
-      acc[bulanTahun].Unit.add(d.pengelola);
-      return acc;
-    }, {});
+      const ringkasanBulanan = unitDeposits.reduce((acc, d) => {
+        const date = new Date(d.date);
+        if (isNaN(date.getTime())) return acc;
+        const bulanTahun = `${NAMA_BULAN_INDO[date.getMonth()]} ${date.getFullYear()}`;
+        if (!acc[bulanTahun]) acc[bulanTahun] = { sortKey: date.getFullYear() * 100 + date.getMonth(), Organik: 0, Anorganik: 0, Residu: 0, Unit: new Set() };
+        acc[bulanTahun][d.category] = (acc[bulanTahun][d.category] || 0) + (Number(d.weight) || 0);
+        acc[bulanTahun].Unit.add(d.pengelola);
+        return acc;
+      }, {});
 
-    sheetsData["Ringkasan"] = Object.entries(ringkasanBulanan).sort((a,b) => a[1].sortKey - b[1].sortKey).map(([bulan, data]) => ({
-      'Periode': bulan,
-      'Total Organik (Kg)': data.Organik.toFixed(1),
-      'Total Anorganik (Kg)': data.Anorganik.toFixed(1),
-      'Total Residu (Kg)': data.Residu.toFixed(1),
-      'Total Keseluruhan (Kg)': (data.Organik + data.Anorganik + data.Residu).toFixed(1),
-      'Jumlah Pengelola': data.Unit.size
-    }));
+      sheetsData["Ringkasan"] = Object.entries(ringkasanBulanan).sort((a,b) => a[1].sortKey - b[1].sortKey).map(([bulan, data]) => ({
+        'Periode': bulan,
+        'Total Organik (Kg)': data.Organik.toFixed(1),
+        'Total Anorganik (Kg)': data.Anorganik.toFixed(1),
+        'Total Residu (Kg)': data.Residu.toFixed(1),
+        'Total Keseluruhan (Kg)': (data.Organik + data.Anorganik + data.Residu).toFixed(1),
+        'Jumlah Pengelola': data.Unit.size
+      }));
 
-    // Neraca Sampah
-    const neracaBerdasarkanUnit = neraca.filter(n => !userUnit || n.unit === userUnit);
-    sheetsData["Neraca_Sampah"] = neracaBerdasarkanUnit.map(n => ({
-      'Bulan': n.month,
-      'Kategori': n.category,
-      'Jenis Sampah': n.jenis,
-      'Timbulan (Kg)': Number(n.timbulan).toFixed(1),
-      'Dimanfaatkan (Kg)': Number(n.dimanfaatkan).toFixed(1),
-      'Persentase Pemanfaatan': (Number(n.dimanfaatkan) / Number(n.timbulan) * 100 || 0).toFixed(1) + '%',
-      'Unit Kerja': n.unit
-    }));
+      const neracaBerdasarkanUnit = neraca.filter(n => !userUnit || n.unit === userUnit);
+      sheetsData["Neraca_Sampah"] = neracaBerdasarkanUnit.map(n => ({
+        'Bulan': n.month,
+        'Kategori': n.category,
+        'Jenis Sampah': n.jenis,
+        'Timbulan (Kg)': Number(n.timbulan).toFixed(1),
+        'Dimanfaatkan (Kg)': Number(n.dimanfaatkan).toFixed(1),
+        'Persentase Pemanfaatan': (Number(n.dimanfaatkan) / Number(n.timbulan) * 100 || 0).toFixed(1) + '%',
+        'Unit Kerja': n.unit
+      }));
 
-    // Kinerja Per Unit
-    const dataKinerja = unitDeposits.reduce((acc, d) => {
-      if (!acc[d.pengelola]) acc[d.pengelola] = { total: 0, count: 0, Organik: 0, Anorganik: 0, Residu: 0 };
-      acc[d.pengelola].total += Number(d.weight);
-      acc[d.pengelola].count += 1;
-      acc[d.pengelola][d.category] = (acc[d.pengelola][d.category] || 0) + Number(d.weight);
-      return acc;
-    }, {});
-    
-    sheetsData["Kinerja_Per_Unit"] = Object.entries(dataKinerja).map(([pengelola, data]) => ({
-      'Nama Pengelola / Unit': pengelola,
-      'Total Transaksi': data.count,
-      'Organik (Kg)': data.Organik.toFixed(1),
-      'Anorganik (Kg)': data.Anorganik.toFixed(1),
-      'Residu (Kg)': data.Residu.toFixed(1),
-      'Total Berat Keseluruhan (Kg)': data.total.toFixed(1)
-    }));
+      const dataKinerja = unitDeposits.reduce((acc, d) => {
+        if (!acc[d.pengelola]) acc[d.pengelola] = { total: 0, count: 0, Organik: 0, Anorganik: 0, Residu: 0 };
+        acc[d.pengelola].total += Number(d.weight);
+        acc[d.pengelola].count += 1;
+        acc[d.pengelola][d.category] = (acc[d.pengelola][d.category] || 0) + Number(d.weight);
+        return acc;
+      }, {});
+      
+      sheetsData["Kinerja_Per_Unit"] = Object.entries(dataKinerja).map(([pengelola, data]) => ({
+        'Nama Pengelola / Unit': pengelola,
+        'Total Transaksi': data.count,
+        'Organik (Kg)': data.Organik.toFixed(1),
+        'Anorganik (Kg)': data.Anorganik.toFixed(1),
+        'Residu (Kg)': data.Residu.toFixed(1),
+        'Total Berat Keseluruhan (Kg)': data.total.toFixed(1)
+      }));
 
-    // Detail Transaksi
-    sheetsData["Detail_Transaksi"] = [...unitDeposits].sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
-      'Tanggal': d.date, 
-      'Pengelola': d.pengelola, 
-      'Kategori': d.category, 
-      'Jenis': d.jenis, 
-      'Berat (Kg)': Number(d.weight).toFixed(1)
-    }));
+      sheetsData["Detail_Transaksi"] = [...unitDeposits].sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
+        'Tanggal': d.date, 
+        'Pengelola': d.pengelola, 
+        'Kategori': d.category, 
+        'Jenis': d.jenis, 
+        'Berat (Kg)': Number(d.weight).toFixed(1)
+      }));
 
-    // Data Pemanfaatan
-    try {
-      const pemRes = await fetch('/api/input-program');
-      const pemData = await pemRes.json();
-      if (pemData.success && pemData.data.length > 0) {
-        sheetsData["Data_Pemanfaatan_Raw"] = pemData.data.map(d => {
-          const row = {
-            'Tanggal': d.date,
-            'Waktu': d.time,
-            'Pengelola / User': d.user,
-            'Unit': d.unit,
-            'Nama Program': d.program_name,
-            'Kategori Sampah': d.kategori_sampah || '-',
-            'Jenis Sampah': d.jenis_sampah || '-'
-          };
-          if (d.form_data) {
-            Object.entries(d.form_data).forEach(([key, val]) => {
-              row[key] = val;
-            });
-          }
-          return row;
-        });
+      try {
+        const pemRes = await fetch('/api/input-program');
+        const pemData = await pemRes.json();
+        if (pemData.success && pemData.data.length > 0) {
+          sheetsData["Data_Pemanfaatan_Raw"] = pemData.data.map(d => {
+            const row = {
+              'Tanggal': d.date,
+              'Waktu': d.time,
+              'Pengelola / User': d.user,
+              'Unit': d.unit,
+              'Nama Program': d.program_name,
+              'Kategori Sampah': d.kategori_sampah || '-',
+              'Jenis Sampah': d.jenis_sampah || '-'
+            };
+            if (d.form_data) {
+              Object.entries(d.form_data).forEach(([key, val]) => {
+                row[key] = val;
+              });
+            }
+            return row;
+          });
 
-        // Rekapitulasi per Program (seperti file Excel Keperluan)
-        const programs = [...new Set(pemData.data.map(d => d.program_name))];
-        const currentYear = new Date().getFullYear();
-        const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+          const programs = [...new Set(pemData.data.map(d => d.program_name))];
+          const currentYear = new Date().getFullYear();
+          const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
-        programs.forEach(programName => {
-           const progData = pemData.data.filter(d => d.program_name === programName && d.date.startsWith(`${currentYear}`));
-           
-           const monthlyData = {};
-           progData.forEach(d => {
-             const monthIdx = parseInt(d.date.substring(5, 7)) - 1;
-             if (!monthlyData[monthIdx]) monthlyData[monthIdx] = { weight: 0 };
+          programs.forEach(programName => {
+             const progData = pemData.data.filter(d => d.program_name === programName && d.date.startsWith(`${currentYear}`));
              
-             let weight = 0;
-             if (d.form_data) {
-               const numericValues = Object.values(d.form_data).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
-               if (numericValues.length > 0) weight = numericValues[0];
-             }
-             monthlyData[monthIdx].weight += weight;
-           });
+             const monthlyData = {};
+             progData.forEach(d => {
+               const monthIdx = parseInt(d.date.substring(5, 7)) - 1;
+               if (!monthlyData[monthIdx]) monthlyData[monthIdx] = { weight: 0 };
+               
+               let weight = 0;
+               if (d.form_data) {
+                 const numericValues = Object.values(d.form_data).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);
+                 if (numericValues.length > 0) weight = numericValues[0];
+               }
+               monthlyData[monthIdx].weight += weight;
+             });
 
-           const sheetRows = MONTHS.map((month, idx) => {
-             const weightKg = monthlyData[idx] ? monthlyData[idx].weight : 0;
-             const weightTon = weightKg / 1000;
-             return {
-                'Bulan': month,
-                'Total Pemanfaatan (Kg)': weightKg,
-                'Absolut (Ton)': weightTon,
-                'Anggaran (Juta Rp)': 0,
-                'Penghematan (Juta Rp)': 0
-             }
-           });
-           
-           const totalKg = sheetRows.reduce((sum, r) => sum + r['Total Pemanfaatan (Kg)'], 0);
-           sheetRows.push({
-             'Bulan': 'TOTAL',
-             'Total Pemanfaatan (Kg)': totalKg,
-             'Absolut (Ton)': totalKg / 1000,
-             'Anggaran (Juta Rp)': 0,
-             'Penghematan (Juta Rp)': 0
-           });
+             const sheetRows = MONTHS.map((month, idx) => {
+               const weightKg = monthlyData[idx] ? monthlyData[idx].weight : 0;
+               const weightTon = weightKg / 1000;
+               return {
+                  'Bulan': month,
+                  'Total Pemanfaatan (Kg)': weightKg,
+                  'Absolut (Ton)': weightTon,
+                  'Anggaran (Juta Rp)': 0,
+                  'Penghematan (Juta Rp)': 0
+               }
+             });
+             
+             const totalKg = sheetRows.reduce((sum, r) => sum + r['Total Pemanfaatan (Kg)'], 0);
+             sheetRows.push({
+               'Bulan': 'TOTAL',
+               'Total Pemanfaatan (Kg)': totalKg,
+               'Absolut (Ton)': totalKg / 1000,
+               'Anggaran (Juta Rp)': 0,
+               'Penghematan (Juta Rp)': 0
+             });
 
-           let safeSheetName = `P_${programName}`.substring(0, 31).replace(/[^a-zA-Z0-9]/g, '_');
-           sheetsData[safeSheetName] = sheetRows;
-        });
+             let safeSheetName = `P_${programName}`.substring(0, 31).replace(/[^a-zA-Z0-9]/g, '_');
+             sheetsData[safeSheetName] = sheetRows;
+          });
+        }
+      } catch (e) {
+        console.error("Gagal mengambil data pemanfaatan untuk excel", e);
       }
-    } catch (e) {
-      console.error("Gagal mengambil data pemanfaatan untuk excel", e);
-    }
 
-    try {
-      await exportToExcelMultiSheet(`Laporan_Bank_Sampah_Lengkap`, sheetsData);
-    } catch (error) {
-      console.error("Gagal ekspor:", error);
-      alert("Terjadi kesalahan proses Excel.");
-    }
-  };
+      try {
+        await exportToExcelMultiSheet(`Laporan_Bank_Sampah_Lengkap`, sheetsData);
+      } catch (error) {
+        console.error("Gagal ekspor:", error);
+        alert("Terjadi kesalahan proses Excel.");
+      }
+    };
 
     const handleExportPDF = () => {
-  if (!startDate || !endDate) {
-    setError('Harus pilih rentang tanggal untuk download laporan pdf!');
-    return;
-  }
+      if (!startDate || !endDate) {
+        setError('Harus pilih rentang tanggal untuk download laporan pdf!');
+        return;
+      }
 
+      const filtered = unitDeposits.filter(d => d.date >= startDate && d.date <= endDate);
+      if (filtered.length === 0) {
+        setError('Tidak ada data pada rentang tanggal tersebut.');
+        return;
+      }
 
-  
-  const filtered = unitDeposits.filter(d => d.date >= startDate && d.date <= endDate);
-  if (filtered.length === 0) {
-    setError('Tidak ada data pada rentang tanggal tersebut.');
-    return;
-  }
+      const ringkasan = filtered.reduce((acc, d) => {
+        acc[d.category] = (acc[d.category] || 0) + Number(d.weight);
+        return acc;
+      }, {});
+      
+      const kinerja = filtered.reduce((acc, d) => {
+        if (!acc[d.pengelola]) acc[d.pengelola] = { Organik: 0, Anorganik: 0, Residu: 0 };
+        if (acc[d.pengelola].hasOwnProperty(d.category)) {
+          acc[d.pengelola][d.category] += Number(d.weight);
+        }
+        return acc;
+      }, {});
+      
+      const tables = [
+        {
+          title: "Ringkasan Laporan",
+          columns: ['Kategori', 'Berat (Kg)'],
+          body: Object.entries(ringkasan).map(([cat, val]) => [cat, val.toFixed(1)])
+        },
+        {
+          title: "Detail Transaksi",
+          columns: ['Tanggal', 'Pengelola', 'Kategori', 'Jenis', 'Berat'],
+          body: filtered.map(d => [d.date, d.pengelola, d.category, d.jenis, `${Number(d.weight).toFixed(1)} Kg`])
+        },
+        {
+          title: "Neraca Sampah",
+          columns: ['Bulan', 'Kategori', 'Timbulan', 'Dimanfaatkan'],
+          body: neraca.filter(n => n.month.startsWith(startDate.substring(0,7))).map(n => [n.month, n.category, n.timbulan, n.dimanfaatkan])
+        },
+        {
+          title: "Kinerja Per Unit",
+          columns: ['Pengelola', 'Organik', 'Anorganik', 'Residu'],
+          body: Object.entries(kinerja).map(([p, d]) => [p, d.Organik.toFixed(1), d.Anorganik.toFixed(1), d.Residu.toFixed(1)])
+        }
+      ];
 
-  // Kalkulasi Ringkasan
-  const ringkasan = filtered.reduce((acc, d) => {
-    acc[d.category] = (acc[d.category] || 0) + Number(d.weight);
-    return acc;
-  }, {});
-  
-  // Kalkulasi Kinerja Per Unit
-  const kinerja = filtered.reduce((acc, d) => {
-    if (!acc[d.pengelola]) acc[d.pengelola] = { Organik: 0, Anorganik: 0, Residu: 0 };
-    if (acc[d.pengelola].hasOwnProperty(d.category)) {
-      acc[d.pengelola][d.category] += Number(d.weight);
-    }
-    return acc;
-  }, {});
-  
-  // Format data untuk PDF
-  const tables = [
-    {
-      title: "Ringkasan Laporan",
-      columns: ['Kategori', 'Berat (Kg)'],
-      body: Object.entries(ringkasan).map(([cat, val]) => [cat, val.toFixed(1)])
-    },
-    {
-      title: "Detail Transaksi",
-      columns: ['Tanggal', 'Pengelola', 'Kategori', 'Jenis', 'Berat'],
-      body: filtered.map(d => [d.date, d.pengelola, d.category, d.jenis, `${Number(d.weight).toFixed(1)} Kg`])
-    },
-    {
-      title: "Neraca Sampah",
-      columns: ['Bulan', 'Kategori', 'Timbulan', 'Dimanfaatkan'],
-      body: neraca.filter(n => n.month.startsWith(startDate.substring(0,7))).map(n => [n.month, n.category, n.timbulan, n.dimanfaatkan])
-    },
-    {
-      title: "Kinerja Per Unit",
-      columns: ['Pengelola', 'Organik', 'Anorganik', 'Residu'],
-      body: Object.entries(kinerja).map(([p, d]) => [p, d.Organik.toFixed(1), d.Anorganik.toFixed(1), d.Residu.toFixed(1)])
-    }
-  ];
-
-  exportToPDF('Laporan_Pengelolaan_Sampah', tables, { 
-    periode: `${startDate} s/d ${endDate}`,
-    unit: userUnit 
-  });
-  
-  setError(null); // Reset pesan error jika berhasil
-};
+      exportToPDF('Laporan_Pengelolaan_Sampah', tables, { 
+        periode: `${startDate} s/d ${endDate}`,
+        unit: userUnit 
+      });
+      
+      setError(null); 
+    };
 
     return (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-    {/* Box Pesan Error (Agar muncul di UI) */}
-    {error && (
-      <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>{error}</span>
-        <button onClick={() => setError(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 800 }}>×</button>
-      </div>
-    )}
-
-    <div style={{ display: 'flex', justifyContent: 'space-between', background: 'white', padding: '16px 20px', borderRadius: 12, border: '1px solid var(--ds-border)', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ position: 'relative' }}>
-          <button 
-            onClick={(e) => {
-              const menu = e.currentTarget.nextElementSibling;
-              menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-            }}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
-          >
-            <Download size={16} /> Export
-          </button>
-          <div className="export-menu" style={{ display: 'none', position: 'absolute', top: '110%', left: 0, zIndex: 10, background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-            <button onClick={(e) => { handleExportExcel(); e.target.parentElement.style.display = 'none'; }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}>Excel</button>
-            <button onClick={(e) => { handleExportPDF(); e.target.parentElement.style.display = 'none'; }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}>PDF</button>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {error && (
+          <div style={{ padding: '12px 16px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#B91C1C', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{error}</span>
+            <button onClick={() => setError(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 800 }}>×</button>
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F8FAFC', padding: '4px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
-          <input type="date" onChange={(e) => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', padding: '4px 8px', fontSize: '0.8rem', outline: 'none' }} />
-          <span style={{ color: '#94A3B8' }}>—</span>
-          <input type="date" onChange={(e) => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', padding: '4px 8px', fontSize: '0.8rem', outline: 'none' }} />
-        </div>
-      </div>
+        )}
 
-        {/* KANAN: Filter Periode */}
-        <select value={laporanFilter} onChange={e => setLaporanFilter(e.target.value)} style={{ padding: '6px 12px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: '0.82rem', cursor: 'pointer', background: 'white' }}>
-          <option value="semua">Semua</option>
-          <option value="hari">Hari Ini</option>
-          <option value="minggu">Minggu Ini</option>
-          <option value="bulan">Bulan Ini</option>
-        </select>
-      </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', background: 'white', padding: '16px 20px', borderRadius: 12, border: '1px solid var(--ds-border)', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ position: 'relative' }}>
+              <button 
+                onClick={(e) => {
+                  const menu = e.currentTarget.nextElementSibling;
+                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: '0.85rem', fontWeight: 600, color: '#475569', cursor: 'pointer' }}
+              >
+                <Download size={16} /> Export
+              </button>
+              <div className="export-menu" style={{ display: 'none', position: 'absolute', top: '110%', left: 0, zIndex: 10, background: 'white', border: '1px solid #E2E8F0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                <button onClick={(e) => { handleExportExcel(); e.target.parentElement.style.display = 'none'; }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}>Excel</button>
+                <button onClick={(e) => { handleExportPDF(); e.target.parentElement.style.display = 'none'; }} style={{ display: 'block', width: '100%', padding: '10px 16px', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}>PDF</button>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#F8FAFC', padding: '4px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+              <input type="date" onChange={(e) => setStartDate(e.target.value)} style={{ background: 'transparent', border: 'none', padding: '4px 8px', fontSize: '0.8rem', outline: 'none' }} />
+              <span style={{ color: '#94A3B8' }}>—</span>
+              <input type="date" onChange={(e) => setEndDate(e.target.value)} style={{ background: 'transparent', border: 'none', padding: '4px 8px', fontSize: '0.8rem', outline: 'none' }} />
+            </div>
+          </div>
+
+          <select value={laporanFilter} onChange={e => setLaporanFilter(e.target.value)} style={{ padding: '6px 12px', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: '0.82rem', cursor: 'pointer', background: 'white' }}>
+            <option value="semua">Semua</option>
+            <option value="hari">Hari Ini</option>
+            <option value="minggu">Minggu Ini</option>
+            <option value="bulan">Bulan Ini</option>
+          </select>
+        </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16 }}>
           <div style={{ background: '#D1FAE5', borderRadius: 20, padding: 24, border: '1px solid rgba(16, 185, 129, 0.2)' }}>
@@ -882,71 +964,71 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
   };
 
   const renderNeraca = () => {
-  const filteredNeraca = neraca.filter(n => {
-    const matchMonth = n.month === selectedBulan;
-    const matchUnit = !userUnit || n.unit === userUnit;
-    return matchMonth && matchUnit;
-  });
+    const filteredNeraca = neraca.filter(n => {
+      const matchMonth = n.month === selectedBulan;
+      const matchUnit = !userUnit || n.unit === userUnit;
+      return matchMonth && matchUnit;
+    });
 
-  return (
-    <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, letterSpacing: '-0.3px' }}>
-            Neraca Sampah Bulanan - Unit {userUnit === 'Wonogiri' ? 'PLTA Wonogiri' : (userUnit === 'Banjarnegara' ? 'PLTA PB.Soedirman' : userUnit || 'Semua Unit')}
-          </h3>
-          <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--ds-text-muted)' }}>
-            Menampilkan data timbulan dan pemanfaatan sampah
-          </p>
+    return (
+      <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, letterSpacing: '-0.3px' }}>
+              Neraca Sampah Bulanan - Unit {userUnit === 'Wonogiri' ? 'PLTA Wonogiri' : (userUnit === 'Banjarnegara' ? 'PLTA PB.Soedirman' : userUnit || 'Semua Unit')}
+            </h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--ds-text-muted)' }}>
+              Menampilkan data timbulan dan pemanfaatan sampah
+            </p>
+          </div>
+          
+          <select value={selectedBulan} onChange={e => setSelectedBulan(e.target.value)}
+            style={{ padding: '8px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '0.88rem', outline: 'none', background: 'white', fontFamily: 'inherit', color: 'var(--ds-text)', cursor: 'pointer' }}>
+            <option value="2026-07">Juli 2026</option>
+            <option value="2026-06">Juni 2026</option>
+          </select>
         </div>
-        
-        <select value={selectedBulan} onChange={e => setSelectedBulan(e.target.value)}
-          style={{ padding: '8px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '0.88rem', outline: 'none', background: 'white', fontFamily: 'inherit', color: 'var(--ds-text)', cursor: 'pointer' }}>
-          <option value="2026-07">Juli 2026</option>
-          <option value="2026-06">Juni 2026</option>
-        </select>
-      </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kategori</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis Sampah</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Timbulan (Kg)</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Yang Dimanfaatkan (Kg)</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Persentase</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredNeraca.length === 0 ? (
-              <tr>
-                <td colSpan="5" style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>
-                  Tidak ada data neraca sampah untuk unit dan periode ini.
-                </td>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kategori</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis Sampah</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Timbulan (Kg)</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Yang Dimanfaatkan (Kg)</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Persentase</th>
               </tr>
-            ) : (
-              filteredNeraca.map((n, i) => {
-                const timb = Number(n.timbulan) || 0;
-                const diman = Number(n.dimanfaatkan) || 0;
-                const perc = timb > 0 ? (diman / timb) * 100 : 0;
-                return (
-                  <tr key={n.id} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
-                    <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{n.category}</td>
-                    <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--ds-text)' }}>{n.jenis}</td>
-                    <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{timb.toFixed(1)}</td>
-                    <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: '#047857', fontWeight: 600 }}>{diman.toFixed(1)}</td>
-                    <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 800, color: 'var(--ds-text)' }}>{perc.toFixed(1)}%</td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredNeraca.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>
+                    Tidak ada data neraca sampah untuk unit dan periode ini.
+                  </td>
+                </tr>
+              ) : (
+                filteredNeraca.map((n, i) => {
+                  const timb = Number(n.timbulan) || 0;
+                  const diman = Number(n.dimanfaatkan) || 0;
+                  const perc = timb > 0 ? (diman / timb) * 100 : 0;
+                  return (
+                    <tr key={n.id} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: i % 2 === 0 ? 'white' : '#FAFCFD' }}>
+                      <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{n.category}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--ds-text)' }}>{n.jenis}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{timb.toFixed(1)}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: '#047857', fontWeight: 600 }}>{diman.toFixed(1)}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 800, color: 'var(--ds-text)' }}>{perc.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const renderBuktiBayar = () => (
     <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
@@ -1106,6 +1188,173 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
     </div>
   );
 
+  // --- RENDER TABEL MYSQL & FIREBASE KHUSUS ADMIN SIS ---
+  const renderDataUserDB = () => {
+    const activeData = userSourceTab === 'mysql' ? mysqlUsers : firebaseUsers;
+    const filteredUsers = activeData.filter(u => {
+      const q = searchQuery.toLowerCase();
+      return (u.name || u.displayName || u.email || u.uid || '').toLowerCase().includes(q) ||
+             (u.role || u.provider || '').toLowerCase().includes(q) ||
+             (u.unit || '').toLowerCase().includes(q);
+    });
+
+    return (
+      <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0 }}>Pengelolaan Pengguna Sistem</h3>
+            <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--ds-text-muted)' }}>
+              Integrasi Data Pengguna Database MySQL dan Firebase Authentication
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={fetchUsersData} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', background: '#F1F5F9', border: '1px solid var(--ds-border)', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
+              <RefreshCw size={14} className={loadingUsers ? 'spin' : ''} /> Refresh
+            </button>
+            <button onClick={() => setShowAddUserModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', background: 'var(--ds-accent)', color: 'white', border: 'none', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>
+              <UserPlus size={16} /> Tambah User
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, borderBottom: '2px solid #F1F5F9', marginBottom: 20 }}>
+          <button
+            onClick={() => { setUserSourceTab('mysql'); setTablePage(1); }}
+            style={{
+              padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+              color: userSourceTab === 'mysql' ? 'var(--ds-accent)' : 'var(--ds-text-muted)',
+              borderBottom: userSourceTab === 'mysql' ? '2px solid var(--ds-accent)' : '2px solid transparent',
+              marginBottom: -2
+            }}
+          >
+            MySQL Users ({mysqlUsers.length})
+          </button>
+          <button
+            onClick={() => { setUserSourceTab('firebase'); setTablePage(1); }}
+            style={{
+              padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+              color: userSourceTab === 'firebase' ? 'var(--ds-accent)' : 'var(--ds-text-muted)',
+              borderBottom: userSourceTab === 'firebase' ? '2px solid var(--ds-accent)' : '2px solid transparent',
+              marginBottom: -2
+            }}
+          >
+            Firebase Auth ({firebaseUsers.length})
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', width: 320 }}>
+            <Search size={16} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--ds-text-muted)' }} />
+            <input 
+              type="text" 
+              placeholder="Cari ID, Nama, Email, Role..." 
+              value={searchQuery} 
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px 10px 40px', border: '1.5px solid var(--ds-border)', borderRadius: 12, fontSize: '0.85rem', outline: 'none' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
+            <button 
+              disabled={!selectedRow || userSourceTab === 'firebase'} 
+              onClick={() => {
+                setEditingItem(selectedRow.id);
+                setEditFormType('user-mysql');
+                setEditFormData(selectedRow);
+              }} 
+              style={{ padding: '8px 16px', background: selectedRow && userSourceTab === 'mysql' ? '#F1F5F9' : '#F8FAFC', color: selectedRow && userSourceTab === 'mysql' ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow && userSourceTab === 'mysql' ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem' }}
+            >
+              Edit
+            </button>
+            <button 
+              disabled={!selectedRow} 
+              onClick={() => selectedRow && handleDelete(selectedRow.id || selectedRow.uid, `user-${userSourceTab}`)} 
+              style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem' }}
+            >
+              Hapus
+            </button>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <th style={{ padding: '14px 18px', width: 40 }}></th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>{userSourceTab === 'mysql' ? 'ID User' : 'UID Firebase'}</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>{userSourceTab === 'mysql' ? 'Nama (Name)' : 'Pengenal / Email'}</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Email</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>{userSourceTab === 'mysql' ? 'Role' : 'Penyedia'}</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>{userSourceTab === 'mysql' ? 'Unit Kerja' : 'Diciptakan'}</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>{userSourceTab === 'mysql' ? 'Join Date' : 'Terakhir Masuk'}</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loadingUsers ? (
+                <tr>
+                  <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>Memuat data pengguna...</td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan="8" style={{ padding: '24px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>Data pengguna tidak ditemukan.</td>
+                </tr>
+              ) : (
+                filteredUsers.slice((tablePage - 1) * ITEMS_PER_PAGE, tablePage * ITEMS_PER_PAGE).map((u, i) => {
+                  const idKey = u.id || u.uid;
+                  const isSelected = selectedRow?.id === idKey || selectedRow?.uid === idKey;
+
+                  return (
+                    <tr 
+                      key={idKey} 
+                      onClick={() => setSelectedRow(isSelected ? null : u)}
+                      style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: isSelected ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer' }}
+                    >
+                      <td style={{ padding: '14px 18px' }}>
+                        <input type="radio" checked={isSelected} onChange={() => setSelectedRow(u)} style={{ cursor: 'pointer' }} />
+                      </td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.8rem', color: 'var(--ds-text-muted)', fontFamily: 'monospace', fontWeight: 600 }}>{idKey}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text)' }}>
+                        {u.name || u.displayName || u.email || '-'}
+                      </td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>{u.email || '-'}</td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.85rem' }}>
+                        <span style={{ padding: '4px 8px', borderRadius: 6, background: '#E0F2FE', color: '#0369A1', fontSize: '0.75rem', fontWeight: 700 }}>
+                          {userSourceTab === 'mysql' ? (u.role || 'User') : (u.provider || 'password')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text)' }}>
+                        {userSourceTab === 'mysql' ? (u.unit || 'Pusat') : (u.created_at || '-')}
+                      </td>
+                      <td style={{ padding: '14px 18px', fontSize: '0.85rem', color: 'var(--ds-text-muted)' }}>
+                        {userSourceTab === 'mysql' ? (u.joinDate || '-') : (u.last_sign_in || '-')}
+                      </td>
+                      <td style={{ padding: '14px 18px' }}>
+                        <StatusBadge status={u.status || 'Aktif'} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20 }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)' }}>
+            Halaman {tablePage} dari {Math.ceil(filteredUsers.length / ITEMS_PER_PAGE) || 1}
+          </span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={tablePage === 1} style={{ padding: '6px 12px', border: '1px solid var(--ds-border)', borderRadius: 8, background: 'white', cursor: tablePage === 1 ? 'not-allowed' : 'pointer' }}><ChevronLeft size={16} /></button>
+            <button onClick={() => setTablePage(p => p + 1)} disabled={tablePage >= Math.ceil(filteredUsers.length / ITEMS_PER_PAGE)} style={{ padding: '6px 12px', border: '1px solid var(--ds-border)', borderRadius: 8, background: 'white', cursor: tablePage >= Math.ceil(filteredUsers.length / ITEMS_PER_PAGE) ? 'not-allowed' : 'pointer' }}><ChevronRight size={16} /></button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--ds-bg)', fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}>
       {sidebarOpen && (
@@ -1180,40 +1429,6 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
               Administrator
             </div>
 
-            {/* Modal Tolak Bukti */}
-{rejectTarget && (
-  <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
-    <div style={{ background: 'white', width: 400, borderRadius: '1.5rem', padding: 32 }}>
-      <h3 style={{ margin: '0 0 16px' }}>Alasan Penolakan</h3>
-      <textarea 
-        autoFocus
-        style={{ width: '100%', height: 100, padding: 12, border: '1.5px solid var(--ds-border)', borderRadius: 12, marginBottom: 16 }}
-        placeholder="Tulis alasan penolakan di sini..."
-        onChange={(e) => setRejectReason(e.target.value)}
-      />
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={() => setRejectTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 99, border: '1px solid #E2E8F0', background: 'white' }}>Batal</button>
-        <button onClick={() => { onUpdateBuktiStatus(rejectTarget, 'Ditolak', rejectReason); setRejectTarget(null); setRejectReason(''); }} 
-          style={{ flex: 1, padding: 12, borderRadius: 99, background: '#EF4444', color: 'white', border: 'none' }}>Kirim Penolakan</button>
-      </div>
-    </div>
-  </div>
-)}
-
-{/* Modal Konfirmasi Hapus */}
-{deleteTarget && (
-  <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
-    <div style={{ background: 'white', width: 360, borderRadius: '1.5rem', padding: 32, textAlign: 'center' }}>
-      <Trash2 size={48} color="#EF4444" style={{ marginBottom: 16 }} />
-      <h3>Hapus Bukti?</h3>
-      <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-        <button onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 99, background: '#F1F5F9' }}>Batal</button>
-        <button onClick={() => { onDeleteBuktiBayar(deleteTarget); setDeleteTarget(null); }} style={{ flex: 1, padding: 12, borderRadius: 99, background: '#EF4444', color: 'white' }}>Hapus</button>
-      </div>
-    </div>
-  </div>
-)}
-
             <button onClick={() => setShowLogoutConfirm(true)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
@@ -1238,9 +1453,10 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
           {currentPage === 'rekap-program' && renderRekapProgram()}
           {currentPage === 'bukti-bayar' && renderBuktiBayar()}
           
+          {currentPage === 'data-user-db' && renderDataUserDB()}
           {currentPage === 'master-data' && <MasterDataManagement />}
           {currentPage === 'manajemen-program' && <ManajemenProgram />}
-          {currentPage === 'data-pemanfaatan' && <DataPemanfaatan />}
+          {currentPage === 'data-pemanfaatan' && <DataPemanfaatan userUnit={userUnit} role={role} />}
 
           {currentPage === 'pengelola-data' && (
             <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
@@ -1272,108 +1488,175 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
       </div>
 
       {/* Pop-up Modal Tinjau Kwitansi Admin */}
-{activeKwitansiPopup && (
-  <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
-    <div style={{ background: 'white', width: '100%', maxWidth: 500, borderRadius: '1.5rem', padding: 32 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h3 style={{ margin: 0 }}>Tinjau Kwitansi</h3>
-        <button onClick={() => setActiveKwitansiPopup(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>&times;</button>
-      </div>
+      {activeKwitansiPopup && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', width: '100%', maxWidth: 500, borderRadius: '1.5rem', padding: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0 }}>Tinjau Kwitansi</h3>
+              <button onClick={() => setActiveKwitansiPopup(null)} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>&times;</button>
+            </div>
 
-      <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 15 }}>
-        <div>Unit: <strong>{activeKwitansiPopup.unit}</strong></div>
-        <div>Invoice: <strong>{activeKwitansiPopup.no_bukti}</strong></div>
-        <div>Upload: <strong>{new Date(activeKwitansiPopup.created_at).toLocaleString()}</strong></div>
-        {activeKwitansiPopup.status !== 'Pending' && (
-          <div>Verifikasi: <strong>{new Date(activeKwitansiPopup.updated_at).toLocaleString()}</strong></div>
-        )}
-        {activeKwitansiPopup.remarks && (
-          <div style={{ background: '#FEF2F2', padding: 8, borderRadius: 8, color: '#991B1B' }}>
-            Alasan Ditolak: <strong>{activeKwitansiPopup.remarks}</strong>
+            <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 15 }}>
+              <div>Unit: <strong>{activeKwitansiPopup.unit}</strong></div>
+              <div>Invoice: <strong>{activeKwitansiPopup.no_bukti}</strong></div>
+              <div>Upload: <strong>{new Date(activeKwitansiPopup.created_at).toLocaleString()}</strong></div>
+              {activeKwitansiPopup.status !== 'Pending' && (
+                <div>Verifikasi: <strong>{new Date(activeKwitansiPopup.updated_at).toLocaleString()}</strong></div>
+              )}
+              {activeKwitansiPopup.remarks && (
+                <div style={{ background: '#FEF2F2', padding: 8, borderRadius: 8, color: '#991B1B' }}>
+                  Alasan Ditolak: <strong>{activeKwitansiPopup.remarks}</strong>
+                </div>
+              )}
+            </div>
+
+            <div style={{ position: 'relative', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+              <img 
+                src={activeKwitansiPopup.img_url} 
+                alt="Kwitansi" 
+                style={{ width: '100%', maxHeight: 250, objectFit: 'contain', cursor: 'pointer' }}
+                onClick={() => setFullImage(activeKwitansiPopup.img_url)}
+              />
+              
+              <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 8 }}>
+                <button 
+                  onClick={() => setFullImage(activeKwitansiPopup.img_url)} 
+                  style={{ padding: '8px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
+                >
+                  <Maximize2 size={18} />
+                </button>
+                <a href={activeKwitansiPopup.img_url} download={`Bukti_${activeKwitansiPopup.no_bukti}.png`} 
+                   style={{ padding: '8px', background: '#0891B2', color: 'white', borderRadius: 8 }}>
+                  <Download size={18} />
+                </a>
+              </div>
+            </div>
+
+            {activeKwitansiPopup.status === 'Pending' && onUpdateBuktiStatus && (
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, marginTop: 12 }}>
+                <button onClick={() => { onUpdateBuktiStatus(activeKwitansiPopup.id, 'Lunas'); setActiveKwitansiPopup(null); }}
+                  style={{ flex: 1, padding: '12px', background: '#10B981', color: 'white', border: 'none', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                >Setujui Pembayaran</button>
+                
+                <button onClick={() => { setRejectTarget(activeKwitansiPopup.id); setActiveKwitansiPopup(null); }}
+                  style={{ flex: 1, padding: '12px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
+                >Tolak</button>
+              </div>
+            )}
+            
+            <button onClick={() => setActiveKwitansiPopup(null)} style={{ width: '100%', padding: '12px', background: '#F1F5F9', color: 'var(--ds-text)', border: '1px solid var(--ds-border)', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', marginTop: 8 }}>
+              Kembali
+            </button>
           </div>
-        )}
-      </div>
-
-      <div style={{ position: 'relative', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-  <img 
-    src={activeKwitansiPopup.img_url} 
-    alt="Kwitansi" 
-    style={{ width: '100%', maxHeight: 250, objectFit: 'contain', cursor: 'pointer' }}
-    onClick={() => setFullImage(activeKwitansiPopup.img_url)} // Klik gambar untuk zoom
-  />
-  
-  <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', gap: 8 }}>
-    <button 
-      onClick={() => setFullImage(activeKwitansiPopup.img_url)} 
-      style={{ padding: '8px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer' }}
-    >
-      <Maximize2 size={18} />
-    </button>
-    <a href={activeKwitansiPopup.img_url} download={`Bukti_${activeKwitansiPopup.no_bukti}.png`} 
-       style={{ padding: '8px', background: '#0891B2', color: 'white', borderRadius: 8 }}>
-      <Download size={18} />
-    </a>
-  </div>
-</div>
-
-      {activeKwitansiPopup.status === 'Pending' && onUpdateBuktiStatus && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <button onClick={() => { onUpdateBuktiStatus(activeKwitansiPopup.id, 'Lunas'); setActiveKwitansiPopup(null); }}
-            style={{ flex: 1, padding: '12px', background: '#10B981', color: 'white', border: 'none', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
-          >Setujui Pembayaran</button>
-          
-          {/* MENGGUNAKAN STATE KUSTOM BUKAN PROMPT */}
-          <button onClick={() => { setRejectTarget(activeKwitansiPopup.id); setActiveKwitansiPopup(null); }}
-            style={{ flex: 1, padding: '12px', background: '#EF4444', color: 'white', border: 'none', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s' }}
-          >Tolak</button>
         </div>
       )}
-      
-      <button onClick={() => setActiveKwitansiPopup(null)} style={{ width: '100%', padding: '12px', background: '#F1F5F9', color: 'var(--ds-text)', border: '1px solid var(--ds-border)', borderRadius: '9999px', fontSize: '0.88rem', fontWeight: 700, cursor: 'pointer' }}>
-        Kembali
-      </button>
-    </div>
-  </div>
-)}
 
-{fullImage && (
-  <div 
-    onClick={() => setFullImage(null)} // Klik di mana saja untuk menutup
-    style={{
-      position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center'
-    }}
-  >
-    <img src={fullImage} style={{ maxWidth: '95%', maxHeight: '95%', objectFit: 'contain' }} />
-    <button style={{ position: 'absolute', top: 20, right: 20, background: 'white', border: 'none', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}>
-      <X size={24} />
-    </button>
-  </div>
-)}
+      {fullImage && (
+        <div 
+          onClick={() => setFullImage(null)} 
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.9)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+          <img src={fullImage} style={{ maxWidth: '95%', maxHeight: '95%', objectFit: 'contain' }} />
+          <button style={{ position: 'absolute', top: 20, right: 20, background: 'white', border: 'none', padding: '10px', borderRadius: '50%', cursor: 'pointer' }}>
+            <X size={24} />
+          </button>
+        </div>
+      )}
 
-{/* Modal Alasan Penolakan */}
-{rejectTarget && (
-  <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
-    <div style={{ background: 'white', width: 400, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
-      <h3 style={{ margin: '0 0 16px' }}>Alasan Penolakan</h3>
-      <textarea 
-        autoFocus
-        style={{ width: '100%', height: 100, padding: 12, border: '1.5px solid var(--ds-border)', borderRadius: 12, marginBottom: 16, fontFamily: 'inherit' }}
-        placeholder="Tulis alasan penolakan di sini..."
-        onChange={(e) => setRejectReason(e.target.value)}
-      />
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button onClick={() => setRejectTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 99, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Batal</button>
-        <button onClick={() => { 
-            onUpdateBuktiStatus(rejectTarget, 'Ditolak', rejectReason); 
-            setRejectTarget(null); 
-            setRejectReason(''); 
-        }} 
-          style={{ flex: 1, padding: 12, borderRadius: 99, background: '#EF4444', color: 'white', border: 'none', cursor: 'pointer' }}>Kirim Penolakan</button>
-      </div>
-    </div>
-  </div>
-)}
+      {rejectTarget && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', width: 400, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+            <h3 style={{ margin: '0 0 16px' }}>Alasan Penolakan</h3>
+            <textarea 
+              autoFocus
+              style={{ width: '100%', height: 100, padding: 12, border: '1.5px solid var(--ds-border)', borderRadius: 12, marginBottom: 16, fontFamily: 'inherit' }}
+              placeholder="Tulis alasan penolakan di sini..."
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => setRejectTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 99, border: '1px solid #E2E8F0', background: 'white', cursor: 'pointer' }}>Batal</button>
+              <button onClick={() => { 
+                  onUpdateBuktiStatus(rejectTarget, 'Ditolak', rejectReason); 
+                  setRejectTarget(null); 
+                  setRejectReason(''); 
+              }} 
+                style={{ flex: 1, padding: 12, borderRadius: 99, background: '#EF4444', color: 'white', border: 'none', cursor: 'pointer' }}>Kirim Penolakan</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', width: 360, borderRadius: '1.5rem', padding: 32, textAlign: 'center' }}>
+            <Trash2 size={48} color="#EF4444" style={{ marginBottom: 16 }} />
+            <h3>Hapus Bukti?</h3>
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button onClick={() => setDeleteTarget(null)} style={{ flex: 1, padding: 12, borderRadius: 99, background: '#F1F5F9' }}>Batal</button>
+              <button onClick={() => { onDeleteBuktiBayar(deleteTarget); setDeleteTarget(null); }} style={{ flex: 1, padding: 12, borderRadius: 99, background: '#EF4444', color: 'white' }}>Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAMBAH USER (ADMIN SIS) */}
+      {showAddUserModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', width: '100%', maxWidth: 480, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Tambah Pengguna ({userSourceTab.toUpperCase()})</h3>
+              <button onClick={() => setShowAddUserModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            
+            <form onSubmit={handleCreateUser} style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Nama Lengkap / Username</label>
+                <input type="text" required value={newUserForm.name} onChange={e => setNewUserForm({ ...newUserForm, name: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Email</label>
+                <input type="email" required value={newUserForm.email} onChange={e => setNewUserForm({ ...newUserForm, email: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Password</label>
+                <input type="password" required value={newUserForm.password} onChange={e => setNewUserForm({ ...newUserForm, password: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+              </div>
+              
+              {userSourceTab === 'mysql' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Role</label>
+                      <select value={newUserForm.role} onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }}>
+                        <option value="User">User</option>
+                        <option value="Admin SIS">Admin SIS</option>
+                        <option value="Admin LLK">Admin LLK</option>
+                        <option value="Validator">Validator</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Unit Kerja</label>
+                      <select value={newUserForm.unit} onChange={e => setNewUserForm({ ...newUserForm, unit: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }}>
+                        <option value="Wonogiri">Wonogiri</option>
+                        <option value="Banjarnegara">Banjarnegara</option>
+                        <option value="Pusat">Pusat</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={() => setShowAddUserModal(false)} style={{ flex: 1, padding: '12px', background: 'white', border: '1px solid var(--ds-border)', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Batal</button>
+                <button type="submit" style={{ flex: 1, padding: '12px', background: 'var(--ds-accent)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Simpan User</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {editingItem && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)', animation: 'fadeIn 0.2s ease-out' }}>
@@ -1429,6 +1712,8 @@ export function AdminDashboard({ role, deposits, neraca, buktiBayar, inventarisa
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes scaleUp { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .sidebar-container { left: 0; }
         .main-content { margin-left: 260px; }
         .sidebar-overlay { display: none !important; }
