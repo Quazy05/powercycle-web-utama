@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getDbConnection } from '../../../lib/db';
+import { db } from '../../../lib/firebase';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query as fbQuery, orderBy } from 'firebase/firestore';
 
 export async function GET() {
   try {
-    const pool = await getDbConnection();
-    const [rows] = await pool.query('SELECT * FROM master_unit ORDER BY nama_unit ASC');
+    const q = fbQuery(collection(db, 'master_unit'), orderBy('nama_unit', 'asc'));
+    const snapshot = await getDocs(q);
+    const rows = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     return NextResponse.json({ success: true, data: rows });
   } catch (error) {
-    return NextResponse.json({ success: false, error: 'Failed to fetch unit' }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to fetch unit: ' + error.message }, { status: 500 });
   }
 }
 
@@ -20,13 +23,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Nama unit wajib diisi' }, { status: 400 });
     }
 
-    const pool = await getDbConnection();
-    const [result] = await pool.query(
-      'INSERT INTO master_unit (nama_unit, map_url, image_url) VALUES (?, ?, ?)',
-      [nama_unit.trim(), map_url || null, image_url || null]
-    );
+    const docRef = await addDoc(collection(db, 'master_unit'), {
+      nama_unit: nama_unit.trim(),
+      map_url: map_url || null,
+      image_url: image_url || null
+    });
 
-    return NextResponse.json({ success: true, id: result.insertId });
+    return NextResponse.json({ success: true, id: docRef.id });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
@@ -41,11 +44,12 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, error: 'ID dan Nama Unit wajib diisi' }, { status: 400 });
     }
 
-    const pool = await getDbConnection();
-    await pool.query(
-      'UPDATE master_unit SET nama_unit = ?, map_url = ?, image_url = ? WHERE id = ?',
-      [nama_unit.trim(), map_url || null, image_url || null, id]
-    );
+    const docRef = doc(db, 'master_unit', id.toString());
+    await updateDoc(docRef, {
+      nama_unit: nama_unit.trim(),
+      map_url: map_url || null,
+      image_url: image_url || null
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -60,8 +64,7 @@ export async function DELETE(request) {
 
     if (!id) return NextResponse.json({ success: false, error: 'ID wajib diisi' }, { status: 400 });
 
-    const pool = await getDbConnection();
-    await pool.query('DELETE FROM master_unit WHERE id = ?', [id]);
+    await deleteDoc(doc(db, 'master_unit', id.toString()));
 
     return NextResponse.json({ success: true });
   } catch (error) {

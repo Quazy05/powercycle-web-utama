@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '../../lib/db';
+import { db } from '../../lib/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export async function GET(request) {
   try {
@@ -33,21 +35,26 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
     }
 
-    const docId = 'DOC-' + Date.now();
+    // Save to Firebase directly
+    const docRef = await addDoc(collection(db, 'dokumentasi_kegiatan'), {
+      kegiatan,
+      unit,
+      user: 'User',
+      img_url,
+      location: null,
+      address: 'Uploaded via Website Utama',
+      created_at: new Date().toISOString(),
+      synced_to_mysql: false
+    });
 
-    await query(
-      `INSERT INTO dokumentasi_kegiatan (id, kegiatan, img_url, unit) VALUES (?, ?, ?, ?)`,
-      [docId, kegiatan, img_url, unit]
-    );
-
-    // Logging action
+    // Logging action in MySQL
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     await query(
       'INSERT INTO activity_log (timestamp, user, action, detail, type) VALUES (?, ?, ?, ?, ?)',
       [timestamp, 'User', 'Upload Dokumentasi', `Upload dokumentasi kegiatan ${kegiatan} untuk unit ${unit}`, 'upload']
     );
 
-    return NextResponse.json({ success: true, id: docId });
+    return NextResponse.json({ success: true, id: docRef.id });
   } catch (error) {
     console.error('API POST /dokumentasi Error:', error);
     return NextResponse.json({ error: 'Gagal mengupload dokumentasi' }, { status: 500 });
