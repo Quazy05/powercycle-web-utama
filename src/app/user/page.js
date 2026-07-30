@@ -13,6 +13,7 @@ export default function UserPage() {
   const [buktiBayar, setBuktiBayar] = useState([]);
   const [masterJenis, setMasterJenis] = useState([]);
   const [masterPengelola, setMasterPengelola] = useState([]);
+  const [dokumentasi, setDokumentasi] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,13 +24,14 @@ export default function UserPage() {
 
     async function fetchData() {
       try {
-        const [resDep, resTemp, resNer, resBuk, resJenis, resPengelola] = await Promise.all([
+        const [resDep, resTemp, resNer, resBuk, resJenis, resPengelola, resDok] = await Promise.all([
           fetch('/api/deposits?user=' + username),
           fetch('/api/temporary-deposits?user=' + username),
           fetch('/api/neraca'),
           fetch('/api/bukti' + (unit ? `?unit=${unit}` : '')),
           fetch('/api/master/jenis-sampah'),
-          fetch('/api/master/pengelola')
+          fetch('/api/master/pengelola'),
+          fetch('/api/dokumentasi' + (unit ? `?unit=${unit}` : ''))
         ]);
 
         const dataDep = await resDep.json();
@@ -38,6 +40,7 @@ export default function UserPage() {
         const dataBuk = await resBuk.json();
         const dataJenis = await resJenis.json();
         const dataPengelola = await resPengelola.json();
+        const dataDok = await resDok.json();
 
         let allDeposits = [];
         if (dataDep.success) allDeposits = [...allDeposits, ...dataDep.deposits];
@@ -56,6 +59,7 @@ export default function UserPage() {
         if (dataBuk.success) setBuktiBayar(dataBuk.buktiBayar);
         if (dataJenis.success) setMasterJenis(dataJenis.data);
         if (dataPengelola.success) setMasterPengelola(dataPengelola.data);
+        if (dataDok.success) setDokumentasi(dataDok.data);
       } catch (err) {
         console.error('Failed to fetch user dashboard data:', err);
       } finally {
@@ -192,6 +196,39 @@ export default function UserPage() {
   }
 };
 
+  const handleAddDokumentasi = async (dok) => {
+    try {
+      const res = await fetch('/api/dokumentasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dok)
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDokumentasi(prev => [{...dok, id: data.id, created_at: new Date().toISOString()}, ...prev]);
+      } else {
+        alert('Gagal mengunggah dokumentasi: ' + data.error);
+      }
+    } catch (err) {
+      console.error('Add dokumentasi error:', err);
+    }
+  };
+
+  const handleDeleteDokumentasi = async (id) => {
+    try {
+      const res = await fetch(`/api/dokumentasi/${id}`, { method: 'DELETE' });
+      const text = await res.text();
+      if (!res.ok) throw new Error("Server error: " + res.status);
+      const data = JSON.parse(text);
+      if (data.success) {
+        setDokumentasi(prev => prev.filter(d => d.id !== id));
+      }
+    } catch (err) {
+      console.error("Error Detail:", err);
+      alert("Gagal menghapus dokumentasi: " + err.message);
+    }
+  };
+
   return (
   <UserDashboard 
     deposits={deposits} 
@@ -204,7 +241,10 @@ export default function UserPage() {
     onDeleteDeposit={handleDeleteDeposit}
     onUpdateDeposit={handleUpdateDeposit}
     onAddBuktiBayar={handleAddBuktiBayar}
-    onDeleteBuktiBayar={handleDeleteBukti} // <--- TAMBAHKAN INI
+    onDeleteBuktiBayar={handleDeleteBukti}
+    dokumentasi={dokumentasi}
+    onAddDokumentasi={handleAddDokumentasi}
+    onDeleteDokumentasi={handleDeleteDokumentasi}
     userUnit={unit}
     username={username}
   />

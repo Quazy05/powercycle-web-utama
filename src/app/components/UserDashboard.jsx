@@ -4,7 +4,7 @@ import {
   LayoutDashboard, PlusCircle, History, Database,
   FileCheck, BarChart2, LogOut, Trash2, Calendar,
   Clock, Package, MapPin, Scale, Info, Menu, X, Upload, Eye, Maximize2, Download, Share2,
-  FolderKanban, ClipboardList, ArrowLeft, CheckCircle2, Link2, Copy, ExternalLink
+  FolderKanban, ClipboardList, ArrowLeft, CheckCircle2, Link2, Copy, ExternalLink, Camera
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -118,7 +118,7 @@ function StatCard({ title, value, subtext }) {
   );
 }
 
-export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, masterPengelola, onLogout, onAddDeposit, onDeleteDeposit, onUpdateDeposit, onAddBuktiBayar, onDeleteBuktiBayar, userUnit, username }) {
+export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, masterPengelola, onLogout, onAddDeposit, onDeleteDeposit, onUpdateDeposit, onAddBuktiBayar, onDeleteBuktiBayar, dokumentasi = [], onAddDokumentasi, onDeleteDokumentasi, userUnit, username }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedBulan, setSelectedBulan] = useState('2026-06');
   const [selectedTahun, setSelectedTahun] = useState('2026');
@@ -422,6 +422,74 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
   }
 };
 
+
+  const renderDokumentasi = () => {
+    const [activeDokPopup, setActiveDokPopup] = useState(null);
+    const [dokFullImage, setDokFullImage] = useState(null);
+    
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: '0 0 16px 0', letterSpacing: '-0.3px' }}>Dokumentasi Kegiatan</h3>
+          {(!dokumentasi || dokumentasi.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <Camera size={48} color="var(--ds-accent)" style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+              <p style={{ color: 'var(--ds-text-muted)', fontWeight: 600 }}>Belum ada dokumentasi</p>
+              <p style={{ color: 'var(--ds-text-muted)', fontSize: '0.85rem' }}>Dokumentasi kegiatan akan muncul di sini setelah diupload melalui website validasi.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+              {dokumentasi.map((dok, idx) => (
+                <div key={dok.id || idx} onClick={() => setActiveDokPopup(dok)} style={{ background: 'var(--ds-bg)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--ds-border)', cursor: 'pointer', transition: 'all 0.2s' }}>
+                  {dok.img_url && (
+                    <div style={{ width: '100%', height: 160, overflow: 'hidden' }}>
+                      <img src={dok.img_url} alt={dok.kegiatan} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
+                  <div style={{ padding: 12 }}>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{dok.kegiatan}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{dok.unit} • {dok.created_at ? new Date(dok.created_at).toLocaleDateString('id-ID') : '-'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {activeDokPopup && (
+          <div onClick={() => setActiveDokPopup(null)} style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+            <div onClick={e => e.stopPropagation()} style={{ background: 'white', width: '100%', maxWidth: 500, maxHeight: '90vh', borderRadius: '1.5rem', overflow: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.15)' }}>
+              {activeDokPopup.img_url && (
+                <div style={{ position: 'relative' }}>
+                  <img src={activeDokPopup.img_url} alt={activeDokPopup.kegiatan} onClick={() => setDokFullImage(activeDokPopup.img_url)} style={{ width: '100%', maxHeight: 400, objectFit: 'contain', background: '#000', cursor: 'pointer' }} />
+                </div>
+              )}
+              <div style={{ padding: 24 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800 }}>{activeDokPopup.kegiatan}</h3>
+                <p style={{ margin: '0 0 16px', color: 'var(--ds-text-muted)', fontSize: '0.85rem' }}>Unit: {activeDokPopup.unit} • {activeDokPopup.created_at ? new Date(activeDokPopup.created_at).toLocaleString('id-ID') : '-'}</p>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {onDeleteDokumentasi && (
+                    <button onClick={() => { if (confirm('Hapus dokumentasi ini?')) { onDeleteDokumentasi(activeDokPopup.id); setActiveDokPopup(null); }}} style={{ padding: '10px 20px', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit' }}>
+                      <Trash2 size={14} style={{ marginRight: 6 }} />Hapus
+                    </button>
+                  )}
+                  <button onClick={() => setActiveDokPopup(null)} style={{ padding: '10px 20px', background: 'var(--ds-bg)', color: 'var(--ds-text)', border: '1px solid var(--ds-border)', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit' }}>Tutup</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {dokFullImage && (
+          <div onClick={() => setDokFullImage(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', cursor: 'pointer' }}>
+            <img src={dokFullImage} alt="Full" style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' }} />
+            <button onClick={() => setDokFullImage(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 40, height: 40, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'input', label: 'Input Sampah', icon: PlusCircle },
@@ -430,6 +498,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     { id: 'neraca', label: 'Neraca Sampah', icon: Database },
     { id: 'bukti-bayar', label: 'Bukti Bayar', icon: FileCheck },
     { id: 'ringkasan', label: 'Ringkasan', icon: BarChart2 },
+    { id: 'dokumentasi', label: 'Dokumentasi', icon: Camera },
   ];
 
   const renderDashboard = () => (
@@ -1047,6 +1116,7 @@ const renderBuktiBayar = () => (
           {currentPage === 'riwayat' && renderRiwayat()}
           {currentPage === 'neraca' && renderNeraca()}
           {currentPage === 'bukti-bayar' && renderBuktiBayar()}
+          {currentPage === 'dokumentasi' && renderDokumentasi()}
           {currentPage === 'ringkasan' && (
             <div style={{ background: 'white', borderRadius: '1.5rem', padding: 40, textAlign: 'center', border: '1px solid var(--ds-border)', boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)' }}>
               <BarChart2 size={48} color="var(--ds-accent)" style={{ margin: '0 auto 16px' }} />

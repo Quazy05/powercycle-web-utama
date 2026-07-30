@@ -252,3 +252,14 @@ INSERT INTO activity_log (id, timestamp, user, action, detail, type) VALUES
 (4, '2026-07-01 16:45:00', 'system', 'Sync Data (Cron)', 'D004 - Anorganik (Botol) 12.5 kg - Terverifikasi dari Firebase', 'sync'),
 (5, '2026-07-01 15:30:00', 'system', 'Sync Data (Cron)', 'D006 - Residu (Lainnya) 9.8 kg - Ditolak', 'sync')
 ON DUPLICATE KEY UPDATE timestamp=timestamp;
+
+-- ============================================
+-- dokumentasi_kegiatan
+-- ============================================
+CREATE TABLE IF NOT EXISTS dokumentasi_kegiatan (
+  id VARCHAR(50) PRIMARY KEY,
+  kegiatan VARCHAR(255) NOT NULL,
+  img_url LONGTEXT,
+  unit VARCHAR(50) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -5,7 +5,7 @@ import {
   Search, Package, Scale, ChevronLeft, ChevronRight,
   Database, FileCheck, CheckCircle, Leaf, Recycle, Eye, Upload, Download, Maximize2, X,
   RefreshCw, UserCheck, UserPlus
-} from 'lucide-react';
+, Camera } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
   ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
@@ -132,7 +132,7 @@ function StatCard({ title, value, icon: Icon, color, bg }) {
 
 const ITEMS_PER_PAGE = 10;
 
-export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = [], inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit }) {
+export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = [], inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit, dokumentasi = [] }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -387,6 +387,7 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     { id: 'data-pemanfaatan', label: 'Data Pemanfaatan', icon: Activity },
     { id: 'rekap-program', label: 'Rekap Program Historis', icon: CheckCircle },
     { id: 'bukti-bayar', label: 'Bukti Bayar', icon: Recycle },
+    { id: 'dokumentasi', label: 'Dokumentasi', icon: Camera },
   ];
 
   const pageTitles = {
@@ -399,6 +400,7 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     inventarisasi: 'Inventarisasi Sampah Historis (2021-2026)',
     'rekap-program': 'Rekapitulasi Program Pengelolaan Sampah',
     'data-user-db': 'Kelola Data User',
+    'dokumentasi': 'Dokumentasi Kegiatan',
   };
 
   const Pagination = ({ page, total, onChange, totalItems }) => (
@@ -1456,6 +1458,36 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
           {currentPage === 'data-user-db' && renderDataUserDB()}
           {currentPage === 'master-data' && <MasterDataManagement />}
           {currentPage === 'manajemen-program' && <ManajemenProgram />}
+
+          {currentPage === 'dokumentasi' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: '0 0 16px 0' }}>Dokumentasi Kegiatan</h3>
+                {(!dokumentasi || dokumentasi.length === 0) ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <Camera size={48} color="var(--ds-accent)" style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+                    <p style={{ color: 'var(--ds-text-muted)', fontWeight: 600 }}>Belum ada dokumentasi</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
+                    {dokumentasi.map((dok, idx) => (
+                      <div key={dok.id || idx} style={{ background: 'var(--ds-bg)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--ds-border)' }}>
+                        {dok.img_url && (
+                          <div style={{ width: '100%', height: 160, overflow: 'hidden' }}>
+                            <img src={dok.img_url} alt={dok.kegiatan} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
+                        <div style={{ padding: 12 }}>
+                          <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{dok.kegiatan}</p>
+                          <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{dok.unit} • {dok.created_at ? new Date(dok.created_at).toLocaleDateString('id-ID') : '-'}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {currentPage === 'data-pemanfaatan' && <DataPemanfaatan userUnit={userUnit} role={role} />}
 
           {currentPage === 'pengelola-data' && (

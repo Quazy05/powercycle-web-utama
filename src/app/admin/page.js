@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [rekapProgram, setRekapProgram] = useState([]);
   const [users, setUsers] = useState([]);
   const [clients, setClients] = useState([]);
+  const [dokumentasi, setDokumentasi] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
@@ -27,19 +28,20 @@ export default function AdminPage() {
   const fetchData = useCallback(async () => {
     try {
       const queryUnit = (role === 'admin sis' || !unit) ? '' : `?unit=${unit}`;
-      const [resDep, resTemp, resNer, resBuk, resInv, resRekap, resUsers, resClients] = await Promise.all([
+      const [resDep, resTemp, resNer, resBuk, resInv, resRekap, resUsers, resClients, resDok] = await Promise.all([
         fetch('/api/deposits' + queryUnit),
         fetch('/api/temporary-deposits' + queryUnit),
         fetch('/api/neraca'),
         fetch('/api/bukti' + queryUnit),
         fetch('/api/inventarisasi'),
-        fetch('/api/rekap-program' + queryUnit), // <-- Tambahkan queryUnit di sini agar ikut terfilter
+        fetch('/api/rekap-program' + queryUnit),
         fetch('/api/users'),
-        fetch('/api/clients')
+        fetch('/api/clients'),
+        fetch('/api/dokumentasi' + queryUnit)
       ]);
 
-      const [dataDep, dataTemp, dataNer, dataBuk, dataInv, dataRekap, dataUsers, dataClients] = await Promise.all([
-        resDep.json(), resTemp.json(), resNer.json(), resBuk.json(), resInv.json(), resRekap.json(), resUsers.json(), resClients.json()
+      const [dataDep, dataTemp, dataNer, dataBuk, dataInv, dataRekap, dataUsers, dataClients, dataDok] = await Promise.all([
+        resDep.json(), resTemp.json(), resNer.json(), resBuk.json(), resInv.json(), resRekap.json(), resUsers.json(), resClients.json(), resDok.json()
       ]);
 
       let allDeposits = [];
@@ -60,6 +62,7 @@ export default function AdminPage() {
       if (dataClients.success) setClients(dataClients.clients);
       if (Array.isArray(dataInv)) setInventarisasi(dataInv);
       if (Array.isArray(dataRekap)) setRekapProgram(dataRekap);
+      if (dataDok.success) setDokumentasi(dataDok.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     } finally {
@@ -159,6 +162,7 @@ export default function AdminPage() {
         onUpdateBuktiStatus={handleUpdateBuktiStatus}
         userUnit={unit}
         onRefreshData={fetchData}
+        dokumentasi={dokumentasi}
       />
       
       <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
