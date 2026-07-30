@@ -128,6 +128,8 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
   const [generatedQr, setGeneratedQr] = useState(null);
   const [activeKwitansiPopup, setActiveKwitansiPopup] = useState(null);
   const [fullImage, setFullImage] = useState(null);
+  const [activeDokPopup, setActiveDokPopup] = useState(null);
+  const [dokFullImage, setDokFullImage] = useState(null);
   
   const [dashboardFilter, setDashboardFilter] = useState('hari');
   const [riwayatFilter, setRiwayatFilter] = useState('semua');
@@ -424,8 +426,6 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
 
 
   const renderDokumentasi = () => {
-    const [activeDokPopup, setActiveDokPopup] = useState(null);
-    const [dokFullImage, setDokFullImage] = useState(null);
     
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
