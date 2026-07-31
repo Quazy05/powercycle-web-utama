@@ -1,4 +1,5 @@
 'use client';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useState, useMemo, useEffect, Fragment } from 'react';
 import {
   LayoutDashboard, PlusCircle, History, Database,
@@ -477,11 +478,7 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
                 <h3 style={{ margin: '0 0 8px', fontSize: '1.15rem', fontWeight: 800 }}>{activeDokPopup.kegiatan}</h3>
                 <p style={{ margin: '0 0 16px', color: 'var(--ds-text-muted)', fontSize: '0.85rem' }}>Unit: {activeDokPopup.unit} • {activeDokPopup.created_at ? new Date(activeDokPopup.created_at).toLocaleString('id-ID') : '-'}</p>
                 <div style={{ display: 'flex', gap: 12 }}>
-                  {onDeleteDokumentasi && (
-                    <button onClick={() => { if (confirm('Hapus dokumentasi ini?')) { onDeleteDokumentasi(activeDokPopup.id); setActiveDokPopup(null); }}} style={{ padding: '10px 20px', background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: 'none', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit' }}>
-                      <Trash2 size={14} style={{ marginRight: 6 }} />Hapus
-                    </button>
-                  )}
+                  
                   <button onClick={() => setActiveDokPopup(null)} style={{ padding: '10px 20px', background: 'var(--ds-bg)', color: 'var(--ds-text)', border: '1px solid var(--ds-border)', borderRadius: 12, fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', fontFamily: 'inherit' }}>Tutup</button>
                 </div>
               </div>
@@ -490,9 +487,28 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
         )}
 
         {dokFullImage && (
-          <div onClick={() => setDokFullImage(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)', cursor: 'pointer' }}>
-            <img src={dokFullImage} alt="Full" style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' }} />
-            <button onClick={() => setDokFullImage(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 40, height: 40, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)' }}>
+            <button onClick={() => setDokFullImage(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 40, height: 40, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>✕</button>
+            <TransformWrapper
+              initialScale={1}
+              minScale={0.5}
+              maxScale={5}
+              centerOnInit
+              wheel={{ step: 0.1 }}
+            >
+              {({ zoomIn, zoomOut, resetTransform }) => (
+                <>
+                  <div style={{ position: 'absolute', bottom: 30, display: 'flex', gap: 10, zIndex: 10001 }}>
+                    <button onClick={() => zoomIn()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Zoom In</button>
+                    <button onClick={() => zoomOut()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Zoom Out</button>
+                    <button onClick={() => resetTransform()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Reset</button>
+                  </div>
+                  <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={dokFullImage} alt="Full" style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' }} draggable={false} />
+                  </TransformComponent>
+                </>
+              )}
+            </TransformWrapper>
           </div>
         )}
       </div>

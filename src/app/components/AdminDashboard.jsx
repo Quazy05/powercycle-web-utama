@@ -1485,7 +1485,7 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
                           <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{dok.kegiatan}</p>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                             <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{dok.unit} • {dok.created_at ? new Date(dok.created_at).toLocaleDateString('id-ID') : '-'}</p>
-                            {onDeleteDokumentasi && (!role || role.toLowerCase() === 'admin' || role.toLowerCase() === 'superadmin' || role.toLowerCase() === 'admin portal') && (
+                            {onDeleteDokumentasi && (!role || role.toLowerCase().includes('admin')) && (
                               <button 
                                 onClick={() => { if(window.confirm('Hapus dokumentasi ini?')) onDeleteDokumentasi(dok.id); }} 
                                 style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}
