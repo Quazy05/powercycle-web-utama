@@ -9,7 +9,7 @@ export async function getDbConnection() {
     host: (process.env.DB_HOST || 'localhost').trim(),
     user: (process.env.DB_USER || 'root').trim(),
     password: (process.env.DB_PASSWORD || '').trim(),
-    database: (process.env.DB_NAME || 'bank_sampah_mrica').trim(),
+    database: (process.env.DB_NAME || 'bank_sampah-new').trim(),
     port: parseInt(process.env.DB_PORT || '3306', 10),
     waitForConnections: true,
     connectionLimit: 10,
