@@ -134,6 +134,21 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteDokumentasi = async (id) => {
+    try {
+      const response = await fetch(`/api/dokumentasi/${id}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (data.success) {
+        triggerNotification("Dokumentasi berhasil dihapus!", "success");
+        await fetchData();
+      } else {
+        triggerNotification("Gagal menghapus: " + data.error, "error");
+      }
+    } catch (err) {
+      triggerNotification("Terjadi kesalahan sistem.", "error");
+    }
+  };
+
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><h3>Loading dashboard...</h3></div>;
 
   return (
@@ -163,6 +178,7 @@ export default function AdminPage() {
         userUnit={unit}
         onRefreshData={fetchData}
         dokumentasi={dokumentasi}
+        onDeleteDokumentasi={handleDeleteDokumentasi}
       />
       
       <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>

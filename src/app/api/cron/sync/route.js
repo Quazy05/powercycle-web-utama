@@ -94,7 +94,37 @@ export async function GET() {
 
     await pool.query(`DELETE td FROM temporary_deposits td INNER JOIN deposits d ON td.id = d.id`);
 
-    const details = `Pushed ${pushCount} temporary deposits. Pulled ${pullCount} verified deposits.`;
+    let dokCount = 0;
+    const dokSnapshot = await getDocs(collection(firestore, 'dokumentasi_kegiatan'));
+    for (const docSnap of dokSnapshot.docs) {
+      const data = docSnap.data();
+      const id = docSnap.id;
+
+      if (data.synced_to_mysql === true) continue;
+
+      const [existingDok] = await pool.query('SELECT id FROM dokumentasi_kegiatan WHERE id = ?', [id]);
+      if (existingDok.length === 0) {
+        await pool.query(
+          `INSERT INTO dokumentasi_kegiatan (id, kegiatan, img_url, unit, created_at) VALUES (?, ?, ?, ?, ?)`,
+          [
+            id,
+            data.kegiatan || '',
+            data.img_url || '',
+            data.unit || '',
+            data.created_at ? new Date(data.created_at) : new Date()
+          ]
+        );
+      }
+
+      await setDoc(doc(firestore, 'dokumentasi_kegiatan', id), {
+        synced_to_mysql: true,
+        synced_at: new Date().toISOString()
+      }, { merge: true });
+
+      dokCount++;
+    }
+
+    const details = `Pushed ${pushCount} temporary deposits. Pulled ${pullCount} verified deposits. Pulled ${dokCount} dokumentasi.`;
 
     // Otomatis buat tabel sync_log jika belum ada di database MySQL
     await pool.query(`

@@ -132,7 +132,7 @@ function StatCard({ title, value, icon: Icon, color, bg }) {
 
 const ITEMS_PER_PAGE = 10;
 
-export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = [], inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit, dokumentasi = [] }) {
+export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = [], inventarisasi = [], rekapProgram = [], users = [], clients = [], onLogout, onDeleteDeposit, onUpdateStatus, onUpdateBuktiStatus, userUnit, dokumentasi = [], onDeleteDokumentasi }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1471,7 +1471,7 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
                     {dokumentasi.map((dok, idx) => (
-                      <div key={dok.id || idx} style={{ background: 'var(--ds-bg)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--ds-border)' }}>
+                      <div key={dok.id || idx} style={{ background: 'var(--ds-bg)', borderRadius: 16, overflow: 'hidden', border: '1px solid var(--ds-border)', position: 'relative' }}>
                         {dok.img_url && (
                           <div style={{ width: '100%', height: 160, overflow: 'hidden' }}>
                             <img src={dok.img_url} alt={dok.kegiatan} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1479,7 +1479,18 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
                         )}
                         <div style={{ padding: 12 }}>
                           <p style={{ margin: 0, fontWeight: 700, fontSize: '0.85rem', color: 'var(--ds-text)' }}>{dok.kegiatan}</p>
-                          <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{dok.unit} • {dok.created_at ? new Date(dok.created_at).toLocaleDateString('id-ID') : '-'}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--ds-text-muted)' }}>{dok.unit} • {dok.created_at ? new Date(dok.created_at).toLocaleDateString('id-ID') : '-'}</p>
+                            {onDeleteDokumentasi && (role === 'admin llk' || role === 'admin sis') && (
+                              <button 
+                                onClick={() => { if(window.confirm('Hapus dokumentasi ini?')) onDeleteDokumentasi(dok.id); }} 
+                                style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}
+                                title="Hapus Dokumentasi"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
