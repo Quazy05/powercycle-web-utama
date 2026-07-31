@@ -259,7 +259,17 @@ export default function LoginPage() {
             {loadingUnits ? (
               <p style={{ textAlign: 'center', color: 'var(--ds-text-muted)', padding: '24px 0' }}>Memuat unit terbaru...</p>
             ) : unitList.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--ds-text-muted)', padding: '24px 0' }}>Tidak ada unit yang tersedia.</p>
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <p style={{ color: 'var(--ds-text-muted)', marginBottom: 16 }}>Tidak ada unit yang tersedia di database.</p>
+                <button
+                  onClick={() => handleUnitSelect('Pusat')}
+                  style={{
+                    padding: '12px 24px', background: 'var(--ds-text)', color: 'white', border: 'none', borderRadius: 99, cursor: 'pointer', fontWeight: 700, fontFamily: 'inherit'
+                  }}
+                >
+                  Lanjutkan (Tanpa Unit)
+                </button>
+              </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, maxHeight: '380px', overflowY: 'auto', paddingRight: 4 }}>
                 {unitList.map((unit) => (
