@@ -28,13 +28,10 @@ export function DataPemanfaatan({ userUnit, role }) {
     fetchData();
   }, []);
 
-  // Filter data berdasarkan role dan unit pengguna
   const displayData = useMemo(() => {
-    // Jika role adalah 'admin sis' (Super Admin), tampilkan seluruh data tanpa filter unit
     if (role === 'admin sis') {
       return data;
     }
-    // Untuk Admin LLK / User biasa, saring hanya data yang sesuai dengan userUnit
     if (userUnit) {
       return data.filter(item => item.unit === userUnit);
     }

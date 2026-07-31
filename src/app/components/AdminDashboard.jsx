@@ -163,7 +163,6 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
   const [programsData, setProgramsData] = useState([]);
   const [inputProgramsData, setInputProgramsData] = useState([]);
 
-  // --- STATE DATA USER UNTUK ADMIN SIS ---
   const [userSourceTab, setUserSourceTab] = useState('mysql');
   const [mysqlUsers, setMysqlUsers] = useState([]);
   const [firebaseUsers, setFirebaseUsers] = useState([]);
@@ -1191,7 +1190,6 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     </div>
   );
 
-  // --- RENDER TABEL MYSQL & FIREBASE KHUSUS ADMIN SIS ---
   const renderDataUserDB = () => {
     const activeData = userSourceTab === 'mysql' ? mysqlUsers : firebaseUsers;
     const filteredUsers = activeData.filter(u => {

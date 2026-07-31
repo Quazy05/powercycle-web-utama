@@ -51,12 +51,10 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
   const [activeUnit, setActiveUnit] = useState('all');
   const [showTopBtn, setShowTopBtn] = useState(false);
 
-  // State untuk Data Unit & Peta dari Database
   const [dbUnits, setDbUnits] = useState([]);
   const [activeMapLoc, setActiveMapLoc] = useState(null);
   const [loadingMapUnits, setLoadingMapUnits] = useState(true);
 
-  // Fetch daftar unit dari database saat komponen dimuat
   useEffect(() => {
     const fetchMapUnits = async () => {
       setLoadingMapUnits(true);
@@ -86,7 +84,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Filter data transaksi berdasarkan Unit yang aktif
   const currentFilteredDeposits = useMemo(() => {
     return activeUnit === 'all'
       ? initialDeposits
@@ -122,7 +119,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
     return { totalWeight, organikWeight, anorganikWeight, residuWeight, totalTransactions, totalUsers };
   }, [activeUnit, currentFilteredDeposits, mockUsers]);
 
-  // Statistik per Unit untuk Panel Peta
   const unitStatsMap = useMemo(() => {
     const statsMap = {};
     initialDeposits.forEach(d => {
@@ -158,15 +154,12 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Helper pembuat URL Google Maps Embed (Mendukung PARSING LINK LENGKAP)
   const getMapEmbedUrl = (loc) => {
     if (!loc) return 'https://maps.google.com/maps?q=PT.+PLN+Indonesia+Power+UBP+Mrica&z=17&output=embed';
 
-    // 1. Jika map_url tersedia di database
     if (loc.map_url && loc.map_url.trim() !== '') {
       const rawUrl = loc.map_url.trim();
 
-      // Ekstrak nama lokasi dari URL /place/
       if (rawUrl.includes('/place/')) {
         const matchPlace = rawUrl.match(/\/place\/([^/]+)/);
         if (matchPlace && matchPlace[1]) {
@@ -175,7 +168,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
         }
       }
 
-      // Ekstrak dari URL koordinat /@latitude,longitude
       if (rawUrl.includes('/@')) {
         const matchCoords = rawUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
         if (matchCoords && matchCoords[1] && matchCoords[2]) {
@@ -183,7 +175,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
         }
       }
 
-      // Jika URL sudah mengandung output=embed
       if (rawUrl.includes('output=embed')) {
         return rawUrl;
       }
@@ -191,7 +182,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
       return `https://maps.google.com/maps?q=${encodeURIComponent(rawUrl)}&z=17&output=embed`;
     }
 
-    // 2. Fallback berdasarkan nama unit jika map_url di DB masih kosong
     const name = (loc.nama_unit || '').toLowerCase();
     if (name.includes('mrica') || name.includes('banjarnegara')) {
       return 'https://maps.google.com/maps?q=PT.+PLN+Indonesia+Power+UBP+Mrica&z=17&output=embed';
@@ -206,7 +196,6 @@ export default function LandingPage({ initialDeposits = [], mockUsers = [], pema
     return `https://maps.google.com/maps?q=${encodeURIComponent(loc.nama_unit)}&z=15&output=embed`;
   };
 
-  // Helper pembuat Link Google Maps eksternal
   const getExternalMapUrl = (loc) => {
     if (!loc) return 'https://www.google.com/maps/place/PT.+PLN+Indonesia+Power+UBP+Mrica/';
 

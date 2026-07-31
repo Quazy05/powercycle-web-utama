@@ -19,7 +19,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState(null);
 
-  // Fungsi notifikasi kustom
   const triggerNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
@@ -48,7 +47,6 @@ export default function AdminPage() {
       if (dataDep.success) allDeposits = [...allDeposits, ...dataDep.deposits];
       if (dataTemp.success) allDeposits = [...allDeposits, ...dataTemp.deposits];
       
-      // Deduplicate deposits by id to prevent duplicate React key console errors
       const uniqueMap = new Map();
       allDeposits.forEach(d => { if (d && d.id) uniqueMap.set(d.id, d); });
       allDeposits = Array.from(uniqueMap.values());
@@ -78,7 +76,6 @@ export default function AdminPage() {
     fetchData();
   }, [fetchData, role, router]);
 
-  // Cron Job: Sinkronisasi data MySQL ↔ Firebase setiap 1 menit
   useEffect(() => {
     if (role !== 'admin sis' && role !== 'admin llk') return;
     
@@ -101,9 +98,7 @@ export default function AdminPage() {
       }
     };
 
-    // Jalankan sync pertama kali setelah 5 detik
     const initialTimeout = setTimeout(runSync, 5000);
-    // Lalu setiap interval (default 1 menit)
     const interval = setInterval(runSync, syncInterval);
 
     return () => {

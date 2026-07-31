@@ -41,7 +41,6 @@ export async function POST(request) {
     const depositStatus = 'Menunggu Validasi';
     let isSynced = 0;
 
-    // 1. Simpan ke MySQL lokal terlebih dahulu
     await query(
       `INSERT INTO temporary_deposits (id, date, time, user, client, unit, category, jenis, pengelola, weight, status, remarks, synced) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
@@ -61,7 +60,6 @@ export async function POST(request) {
       ]
     );
 
-    // 2. Langsung kirim ke Firebase Firestore secara instan (agar QR Code bisa langsung di-scan)
     try {
       const docRef = doc(firestore, 'temporary_deposits', depositId);
       await setDoc(docRef, {
@@ -80,7 +78,6 @@ export async function POST(request) {
         alasan_penolakan: ''
       });
 
-      // Update status synced di MySQL jika berhasil terkirim ke Firebase
       await query('UPDATE temporary_deposits SET synced = 1, synced_at = NOW() WHERE id = ?', [depositId]);
       isSynced = 1;
       console.log(`[Instant Sync] Successfully pushed ${depositId} to Firebase.`);
@@ -88,7 +85,6 @@ export async function POST(request) {
       console.warn(`[Instant Sync Warning] Failed to push ${depositId} directly to Firebase. Cron job will retry.`, fbError.message);
     }
 
-    // 3. Catat log aktivitas ke MySQL
     const timestamp = time.length === 5 ? `${date} ${time}:00` : `${date} ${time}`;
     const detailLog = `${category} (${jenis}) ${weight} kg - ${pengelola} (Menunggu Validasi)`;
     await query(

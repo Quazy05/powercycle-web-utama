@@ -23,7 +23,6 @@ export async function POST(request, { params }) {
     const finalPengelola = body.pengelola || current.pengelola;
     const finalWeight = body.weight || current.weight;
 
-    // 1. Masukkan kembali ke temporary_deposits (synced = 0)
     await pool.query(
       `INSERT INTO temporary_deposits (id, date, time, user, client, unit, category, jenis, pengelola, weight, status, synced)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Menunggu Validasi', 0)`,
@@ -41,7 +40,6 @@ export async function POST(request, { params }) {
       ]
     );
 
-    // 2. Langsung kirim instan ke Firebase Firestore agar QR langsung tersedia
     try {
       const docRef = doc(firestore, 'temporary_deposits', id);
       await setDoc(docRef, {
@@ -60,13 +58,11 @@ export async function POST(request, { params }) {
         alasan_penolakan: ''
       });
 
-      // Update status synced di MySQL jadi 1 jika sukses kirim ke Firebase
       await pool.query('UPDATE temporary_deposits SET synced = 1, synced_at = NOW() WHERE id = ?', [id]);
     } catch (fbErr) {
       console.warn('Gagal instant sync ke Firebase saat resubmit, cron akan mencoba retry:', fbErr.message);
     }
     
-    // 3. Hapus dari tabel deposits utama karena sudah dikirim ulang ke temporary
     await pool.query('DELETE FROM deposits WHERE id = ?', [id]);
     
     return NextResponse.json({ success: true, message: 'Data berhasil dikirim ulang dan disinkronkan' });

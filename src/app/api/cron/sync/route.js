@@ -126,7 +126,6 @@ export async function GET() {
 
     const details = `Pushed ${pushCount} temporary deposits. Pulled ${pullCount} verified deposits. Pulled ${dokCount} dokumentasi.`;
 
-    // Otomatis buat tabel sync_log jika belum ada di database MySQL
     await pool.query(`
       CREATE TABLE IF NOT EXISTS sync_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -138,7 +137,6 @@ export async function GET() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // Catat log sukses
     await pool.query(
       'INSERT INTO sync_log (sync_type, records_count, status, details) VALUES (?, ?, ?, ?)',
       ['CRON_SYNC', pushCount + pullCount, 'SUCCESS', details]
@@ -148,7 +146,6 @@ export async function GET() {
   } catch (error) {
     console.error('Cron sync error:', error);
     try {
-      // Pastikan tabel sync_log juga ada saat mencatat error
       await pool.query(`
         CREATE TABLE IF NOT EXISTS sync_log (
           id INT AUTO_INCREMENT PRIMARY KEY,

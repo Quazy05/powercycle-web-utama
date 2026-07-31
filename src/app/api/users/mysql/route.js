@@ -3,7 +3,6 @@ import { getDbConnection } from '@/app/lib/db'; // sesuaikan path lib/db
 
 export const dynamic = 'force-dynamic';
 
-// GET: Ambil Semua User MySQL
 export async function GET() {
   try {
     const pool = await getDbConnection();
@@ -15,14 +14,12 @@ export async function GET() {
   }
 }
 
-// POST: Tambah User Baru ke MySQL
 export async function POST(request) {
   try {
     const pool = await getDbConnection();
     const body = await request.json();
     const { name, email, password, role, unit, status } = body;
 
-    // Generate ID User kustom (misal: U007, U008, dst)
     const [rows] = await pool.query('SELECT id FROM users ORDER BY id DESC LIMIT 1');
     let nextId = 'U001';
     if (rows.length > 0 && rows[0].id.startsWith('U')) {

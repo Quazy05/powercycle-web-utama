@@ -10,7 +10,6 @@ export async function GET(request) {
     let query = 'SELECT * FROM input_program';
     let queryParams = [];
 
-    // Filter berdasarkan unit jika parameter unit dikirim dan bukan 'Semua Unit' / 'all'
     if (unit && unit !== 'Semua Unit' && unit !== 'all') {
       query += ' WHERE unit = ?';
       queryParams.push(unit);
@@ -49,9 +48,7 @@ export async function POST(request) {
       [user, unit || 'Pusat', program_name, date, time, formDataJson, kategori_sampah || '', jenis_sampah || '']
     );
     
-    // Sync ke neraca_sampah jika ada kategori dan jenis
     if (kategori_sampah && jenis_sampah) {
-      // Cari nilai numerik pertama dalam form_data sebagai asumsi berat pemanfaatan
       let weight = 0;
       if (form_data && typeof form_data === 'object') {
         const numericValues = Object.values(form_data).map(v => Number(v)).filter(v => !isNaN(v) && v > 0);

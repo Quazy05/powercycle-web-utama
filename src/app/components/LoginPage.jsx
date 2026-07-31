@@ -22,11 +22,9 @@ export default function LoginPage() {
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [determinedRole, setDeterminedRole] = useState('user');
 
-  // State untuk menyimpan daftar unit dinamis dari database
   const [unitList, setUnitList] = useState([]);
   const [loadingUnits, setLoadingUnits] = useState(false);
 
-  // Fungsi untuk memuat data unit terbaru dari database
   const fetchUnits = async () => {
     setLoadingUnits(true);
     try {
@@ -65,14 +63,12 @@ export default function LoginPage() {
         const role = user.role.toLowerCase();
         setDeterminedRole(role);
         
-        // HANYA ADMIN SIS YANG LANGSUNG BYPASS / TANPA PILIH UNIT
         if (role === 'admin sis') {
           login(role, 'Pusat', username); // Default unit ke Pusat
           router.push('/admin');
           return;
         }
 
-        // ADMIN LLK & USER REGULER TETAP HARUS PILIH UNIT
         await fetchUnits();
         setShowUnitModal(true);
       } else {
@@ -92,7 +88,6 @@ export default function LoginPage() {
     else if (determinedRole === 'user') router.push('/user');
   };
 
-  // Helper untuk menentukan gambar kartu unit (Mengutamakan image_url dari DB)
   const getUnitImage = (unit) => {
     if (unit.image_url && unit.image_url.trim() !== '') {
       return unit.image_url;

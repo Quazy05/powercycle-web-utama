@@ -190,7 +190,6 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     return DAFTAR_PENGELOLA;
   }, [masterPengelola]);
 
-  // 1. Filter setoran sampah milik user & merunut berdasarkan unit
   const myDeposits = useMemo(() => {
     return deposits.filter(d => 
       d.user === username && 
@@ -198,12 +197,10 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     );
   }, [deposits, username, userUnit]);
 
-  // 2. Filter Bukti Bayar khusus untuk unit user
   const unitBuktiBayar = useMemo(() => {
     return buktiBayar.filter(b => !userUnit || b.unit === userUnit);
   }, [buktiBayar, userUnit]);
 
-  // 3. Filter Neraca Sampah (CUKUP TULIS 1 KALI SAJA DI SINI)
   const filteredNeraca = useMemo(() => {
     return neraca.filter(n => 
       n.month === selectedBulan && 
@@ -211,7 +208,6 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
     );
   }, [neraca, selectedBulan, userUnit]);
 
-  // 4. Filter berdasarkan rentang waktu
   const dashboardFilteredDeposits = useMemo(() => {
     return filterDataBerdasarkanWaktu(myDeposits, dashboardFilter);
   }, [myDeposits, dashboardFilter]);

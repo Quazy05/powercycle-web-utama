@@ -13,7 +13,6 @@ export async function PUT(request, { params }) {
     
     const db = await getDbConnection();
     
-    // Ambil data lama untuk neraca sinkronisasi
     const [oldRows] = await db.query('SELECT * FROM input_program WHERE id = ?', [id]);
     let oldData = oldRows.length > 0 ? oldRows[0] : null;
     await db.execute(
@@ -21,7 +20,6 @@ export async function PUT(request, { params }) {
       [user, unit || 'Pusat', program_name, date, time, JSON.stringify(form_data), kategori_sampah || '', jenis_sampah || '', id]
     );
 
-    // Sync Neraca Sampah
     if (oldData && oldData.kategori_sampah && oldData.jenis_sampah) {
       let oldWeight = 0;
       let oldFormData = oldData.form_data;
@@ -71,13 +69,11 @@ export async function DELETE(request, { params }) {
     const { id } = await params;
     const db = await getDbConnection();
     
-    // Ambil data lama untuk neraca sinkronisasi
     const [oldRows] = await db.query('SELECT * FROM input_program WHERE id = ?', [id]);
     let oldData = oldRows.length > 0 ? oldRows[0] : null;
     
     await db.execute('DELETE FROM input_program WHERE id = ?', [id]);
 
-    // Sync Neraca Sampah
     if (oldData && oldData.kategori_sampah && oldData.jenis_sampah) {
       let oldWeight = 0;
       let oldFormData = oldData.form_data;

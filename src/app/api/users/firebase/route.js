@@ -21,7 +21,6 @@ function initFirebaseAdmin() {
   return getApps()[0];
 }
 
-// GET: Ambil Semua User Firebase
 export async function GET() {
   try {
     const adminApp = initFirebaseAdmin();
@@ -48,7 +47,6 @@ export async function GET() {
   }
 }
 
-// POST: Tambah User Baru ke Firebase Auth
 export async function POST(request) {
   try {
     const adminApp = initFirebaseAdmin();

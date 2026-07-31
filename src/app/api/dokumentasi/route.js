@@ -35,7 +35,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Data tidak lengkap' }, { status: 400 });
     }
 
-    // Save to Firebase directly
     const docRef = await addDoc(collection(db, 'dokumentasi_kegiatan'), {
       kegiatan,
       unit,
@@ -47,7 +46,6 @@ export async function POST(request) {
       synced_to_mysql: false
     });
 
-    // Logging action in MySQL
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
     await query(
       'INSERT INTO activity_log (timestamp, user, action, detail, type) VALUES (?, ?, ?, ?, ?)',
