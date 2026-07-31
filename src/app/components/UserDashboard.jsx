@@ -489,6 +489,9 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
         {dokFullImage && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.9)' }}>
             <button onClick={() => setDokFullImage(null)} style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: 40, height: 40, borderRadius: '50%', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>✕</button>
+            <a href={dokFullImage} download="Dokumentasi.png" style={{ position: 'absolute', top: 20, right: 70, background: '#0891B2', color: 'white', border: 'none', padding: '10px 16px', borderRadius: 8, fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer', zIndex: 10001, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Download size={16} /> Download
+            </a>
             <TransformWrapper
               initialScale={1}
               minScale={0.5}
@@ -499,9 +502,9 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
                   <div style={{ position: 'absolute', bottom: 30, display: 'flex', gap: 10, zIndex: 10001 }}>
-                    <button onClick={() => zoomIn()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Zoom In</button>
-                    <button onClick={() => zoomOut()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Zoom Out</button>
-                    <button onClick={() => resetTransform()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>Reset</button>
+                    <button onClick={() => zoomIn()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold', background: 'white', color: 'black' }}>Zoom In</button>
+                    <button onClick={() => zoomOut()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold', background: 'white', color: 'black' }}>Zoom Out</button>
+                    <button onClick={() => resetTransform()} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 'bold', background: 'white', color: 'black' }}>Reset</button>
                   </div>
                   <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <img src={dokFullImage} alt="Full" style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain' }} draggable={false} />
