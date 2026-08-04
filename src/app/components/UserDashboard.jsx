@@ -121,8 +121,10 @@ function StatCard({ title, value, subtext }) {
 
 export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, masterPengelola, onLogout, onAddDeposit, onDeleteDeposit, onUpdateDeposit, onAddBuktiBayar, onDeleteBuktiBayar, dokumentasi = [], onAddDokumentasi, onDeleteDokumentasi, userUnit, username }) {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [selectedBulan, setSelectedBulan] = useState('2026-06');
-  const [selectedTahun, setSelectedTahun] = useState('2026');
+  const today = new Date();
+  const currentMonthValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const [selectedBulan, setSelectedBulan] = useState(currentMonthValue);
+  const [selectedTahun, setSelectedTahun] = useState(today.getFullYear().toString());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -200,6 +202,20 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
   const unitBuktiBayar = useMemo(() => {
     return buktiBayar.filter(b => !userUnit || b.unit === userUnit);
   }, [buktiBayar, userUnit]);
+
+  const monthOptions = useMemo(() => {
+    const options = [];
+    const date = new Date();
+    for (let i = 0; i < 12; i++) {
+      const year = date.getFullYear();
+      const monthNum = date.getMonth() + 1;
+      const value = `${year}-${String(monthNum).padStart(2, '0')}`;
+      const label = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric' }).format(date);
+      options.push({ value, label });
+      date.setMonth(date.getMonth() - 1);
+    }
+    return options;
+  }, []);
 
   const filteredNeraca = useMemo(() => {
     return neraca.filter(n => 
@@ -813,8 +829,9 @@ export function UserDashboard({ deposits, neraca, buktiBayar, masterJenis, maste
           <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--ds-text-muted)' }}>Periode:</label>
           <select value={selectedBulan} onChange={e => setSelectedBulan(e.target.value)}
             style={{ padding: '9px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '0.88rem', outline: 'none', background: 'white', color: 'var(--ds-text)', fontFamily: 'inherit', cursor: 'pointer' }}>
-            <option value="2026-06">Juni 2026</option>
-            <option value="2026-07">Juli 2026</option>
+            {monthOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
       </div>

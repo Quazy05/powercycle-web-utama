@@ -1,5 +1,5 @@
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react';
 import {
   LayoutDashboard, Trash2, Users, Building2, FileText,
   BarChart2, Activity, Settings, LogOut, Menu,
@@ -173,6 +173,37 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     name: '', email: '', password: '', role: 'User', unit: 'Wonogiri', status: 'Aktif'
   });
 
+  const [showAddInvModal, setShowAddInvModal] = useState(false);
+  const [addInvForm, setAddInvForm] = useState({ tahun: '2025', category: 'Organik', jenis: '', timbulan: '', dimanfaatkan: '', residu_tpa: '' });
+
+  const [invActiveTab, setInvActiveTab] = useState('timbulan'); // 'timbulan', 'dimanfaatkan', 'residu'
+  const importInvRef = useRef(null);
+
+  const handleImportInv = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const res = await fetch('/api/inventarisasi/import', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        window.location.reload();
+      } else {
+        alert(data.error || 'Gagal import file');
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan saat upload');
+    }
+    e.target.value = null; 
+  };
+
   const fetchUsersData = async () => {
     setLoadingUsers(true);
     try {
@@ -310,6 +341,50 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     }
   };
 
+  const handleAutoArchive = async (tahun, type) => {
+    if (!window.confirm(`Apakah Anda yakin ingin merekap otomatis seluruh data operasional tahun ${tahun} menjadi data historis?\n\nData yang sudah ada dengan kategori/jenis yang sama akan diperbarui, data baru akan ditambahkan.`)) return;
+    try {
+      const res = await fetch('/api/archive-tahunan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tahun, type })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Rekap berhasil!');
+        window.location.reload();
+      } else {
+        alert(data.error || 'Terjadi kesalahan saat merekap data.');
+      }
+    } catch (err) {
+      alert('Gagal memanggil API rekap otomatis.');
+    }
+  };
+
+  const handleAddInventarisasi = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await fetch('/api/inventarisasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addInvForm)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message || 'Data berhasil ditambahkan!');
+        setShowAddInvModal(false);
+        setAddInvForm({ tahun: selectedTahunHistoris, category: 'Organik', jenis: '', timbulan: '', dimanfaatkan: '', residu_tpa: '' });
+        window.location.reload();
+      } else {
+        alert(data.error || 'Gagal menambahkan data.');
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan.');
+    }
+  };
+
+
+
   const unitDeposits = useMemo(() => deposits.filter(d => !userUnit || d.unit === userUnit), [deposits, userUnit]);
   const unitBuktiBayar = useMemo(() => buktiBayar.filter(b => !userUnit || b.unit === userUnit), [buktiBayar, userUnit]);
 
@@ -385,7 +460,6 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     { id: 'neraca', label: 'Neraca Sampah Bulanan', icon: Database },
     { id: 'inventarisasi', label: 'Inventarisasi Historis', icon: FileCheck },
     { id: 'data-pemanfaatan', label: 'Data Pemanfaatan', icon: Activity },
-    { id: 'rekap-program', label: 'Rekap Program Historis', icon: CheckCircle },
     { id: 'bukti-bayar', label: 'Bukti Bayar', icon: Recycle },
     { id: 'dokumentasi', label: 'Dokumentasi', icon: Camera },
   ];
@@ -398,7 +472,6 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     reports: 'Laporan', neraca: 'Neraca Sampah Bulanan',
     'bukti-bayar': 'Bukti Bayar',
     inventarisasi: 'Inventarisasi Sampah Historis (2021-2026)',
-    'rekap-program': 'Rekapitulasi Program Pengelolaan Sampah',
     'data-user-db': 'Kelola Data User',
     'dokumentasi': 'Dokumentasi Kegiatan',
   };
@@ -1081,114 +1154,115 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
     </div>
   );
 
-  const renderInventarisasi = () => (
-    <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, letterSpacing: '-0.3px' }}>Inventarisasi Sampah Historis</h3>
-        <select value={selectedTahunHistoris} onChange={e => setSelectedTahunHistoris(e.target.value)}
-          style={{ padding: '8px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '0.88rem', outline: 'none', background: 'white', fontFamily: 'inherit', color: 'var(--ds-text)' }}>
-          <option value="2026">Tahun 2026</option>
-          <option value="2025">Tahun 2025</option>
-          <option value="2024">Tahun 2024</option>
-          <option value="2023">Tahun 2023</option>
-          <option value="2022">Tahun 2022</option>
-        </select>
-      </div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'inventarisasi')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'inventarisasi')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              <th style={{ padding: '14px 18px', width: 40 }}></th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kategori</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis Sampah</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Timbulan (Ton)</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Dimanfaatkan (Ton)</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Residu ke TPA (Ton)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {inventarisasi.filter(inv => inv.tahun === selectedTahunHistoris).map((inv, i) => (
-              <tr key={inv.id} onClick={() => setSelectedRow(selectedRow?.id === inv.id ? null : inv)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === inv.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer', transition: 'background 0.2s' }}>
-                <td style={{ padding: '14px 18px' }}>
-                  <input type="radio" checked={selectedRow?.id === inv.id} onChange={() => setSelectedRow(inv)} style={{ cursor: 'pointer' }} />
-                </td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{inv.category}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--ds-text)' }}>{inv.jenis}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{Number(inv.timbulan).toFixed(3)}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: '#047857', fontWeight: 600 }}>{Number(inv.dimanfaatkan).toFixed(3)}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: '#DC2626', fontWeight: 600 }}>{Number(inv.residu_tpa).toFixed(3)}</td>
-              </tr>
-            ))}
-            {inventarisasi.filter(inv => inv.tahun === selectedTahunHistoris).length === 0 && (
-              <tr>
-                <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>Belum ada data inventarisasi untuk tahun ini.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  const renderInventarisasi = () => {
+    // Kumpulkan daftar tahun unik yang ada di database, urutkan
+    const uniqueYears = Array.from(new Set(inventarisasi.map(i => i.tahun))).sort();
+    const displayYears = uniqueYears.length > 0 ? uniqueYears : ['2022', '2023', '2024', '2025'];
+    
+    // Kelompokkan data berdasarkan kategori, lalu jenis
+    const groupedData = {};
+    inventarisasi.forEach(item => {
+      if (!groupedData[item.category]) groupedData[item.category] = {};
+      if (!groupedData[item.category][item.jenis]) groupedData[item.category][item.jenis] = {};
+      
+      groupedData[item.category][item.jenis][item.tahun] = {
+        id: item.id,
+        timbulan: item.timbulan,
+        dimanfaatkan: item.dimanfaatkan,
+        residu_tpa: item.residu_tpa,
+        rawItem: item
+      };
+    });
 
-  const renderRekapProgram = () => (
-    <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, letterSpacing: '-0.3px' }}>Rekapitulasi Program Pengelolaan Sampah</h3>
-        <select value={selectedTahunHistoris} onChange={e => setSelectedTahunHistoris(e.target.value)}
-          style={{ padding: '8px 14px', border: '1.5px solid var(--ds-border)', borderRadius: 10, fontSize: '0.88rem', outline: 'none', background: 'white', fontFamily: 'inherit', color: 'var(--ds-text)' }}>
-          <option value="2026">Tahun 2026</option>
-          <option value="2025">Tahun 2025</option>
-          <option value="2024">Tahun 2024</option>
-          <option value="2023">Tahun 2023</option>
-          <option value="2022">Tahun 2022</option>
-          <option value="2021">Tahun 2021</option>
-        </select>
-      </div>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'rekap')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit</button>
-        <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'rekap')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus</button>
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              <th style={{ padding: '14px 18px', width: 40 }}></th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Nama Program</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Jenis Sampah</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Kegiatan</th>
-              <th style={{ padding: '14px 18px', fontWeight: 700 }}>Absolut (Ton)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rekapProgram.filter(rp => rp.tahun === selectedTahunHistoris).map((rp, i) => (
-              <tr key={rp.id} onClick={() => setSelectedRow(selectedRow?.id === rp.id ? null : rp)} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: selectedRow?.id === rp.id ? '#F0F9FF' : (i % 2 === 0 ? 'white' : '#FAFCFD'), cursor: 'pointer', transition: 'background 0.2s' }}>
-                <td style={{ padding: '14px 18px' }}>
-                  <input type="radio" checked={selectedRow?.id === rp.id} onChange={() => setSelectedRow(rp)} style={{ cursor: 'pointer' }} />
-                </td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--ds-text)' }}>{rp.nama_program}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: 'var(--ds-text)' }}>{rp.jenis_sampah}</td>
-                <td style={{ padding: '14px 18px', fontSize: '0.85rem' }}>
-                  <span style={{ padding: '4px 8px', borderRadius: '4px', background: rp.jenis_kegiatan === 'Pemanfaatan' ? '#ECFCCB' : '#DBEAFE', color: rp.jenis_kegiatan === 'Pemanfaatan' ? '#4D7C0F' : '#1D4ED8', fontWeight: 600 }}>{rp.jenis_kegiatan}</span>
-                </td>
-                <td style={{ padding: '14px 18px', fontSize: '0.9rem', color: '#047857', fontWeight: 700 }}>{Number(rp.absolut_ton).toFixed(3)}</td>
+    let rowIndex = 1;
+
+    return (
+      <div style={{ background: 'white', borderRadius: '1.5rem', padding: 24, boxShadow: '0 10px 30px rgba(8, 145, 178, 0.03)', border: '1px solid var(--ds-border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--ds-text)', margin: 0, letterSpacing: '-0.3px' }}>Inventarisasi Sampah Historis</h3>
+          <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: 10, padding: 4 }}>
+            <button onClick={() => setInvActiveTab('timbulan')} style={{ padding: '8px 16px', background: invActiveTab === 'timbulan' ? 'white' : 'transparent', color: invActiveTab === 'timbulan' ? 'var(--ds-text)' : 'var(--ds-text-muted)', border: 'none', borderRadius: 8, fontWeight: invActiveTab === 'timbulan' ? 700 : 500, cursor: 'pointer', transition: 'all 0.2s', boxShadow: invActiveTab === 'timbulan' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>Timbulan</button>
+            <button onClick={() => setInvActiveTab('dimanfaatkan')} style={{ padding: '8px 16px', background: invActiveTab === 'dimanfaatkan' ? 'white' : 'transparent', color: invActiveTab === 'dimanfaatkan' ? 'var(--ds-text)' : 'var(--ds-text-muted)', border: 'none', borderRadius: 8, fontWeight: invActiveTab === 'dimanfaatkan' ? 700 : 500, cursor: 'pointer', transition: 'all 0.2s', boxShadow: invActiveTab === 'dimanfaatkan' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>Pemanfaatan</button>
+            <button onClick={() => setInvActiveTab('residu')} style={{ padding: '8px 16px', background: invActiveTab === 'residu' ? 'white' : 'transparent', color: invActiveTab === 'residu' ? 'var(--ds-text)' : 'var(--ds-text-muted)', border: 'none', borderRadius: 8, fontWeight: invActiveTab === 'residu' ? 700 : 500, cursor: 'pointer', transition: 'all 0.2s', boxShadow: invActiveTab === 'residu' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none' }}>Residu ke TPA</button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--ds-text-muted)', fontWeight: 600 }}>Aksi:</span>
+            <button disabled={!selectedRow} onClick={() => selectedRow && handleEdit(selectedRow, 'inventarisasi')} style={{ padding: '8px 16px', background: selectedRow ? '#F1F5F9' : '#F8FAFC', color: selectedRow ? '#0F172A' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Edit Data Tabel</button>
+            <button disabled={!selectedRow} onClick={() => selectedRow && handleDelete(selectedRow.id, 'inventarisasi')} style={{ padding: '8px 16px', background: selectedRow ? '#FEE2E2' : '#F8FAFC', color: selectedRow ? '#EF4444' : '#94A3B8', border: '1px solid var(--ds-border)', borderRadius: 8, cursor: selectedRow ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s' }}>Hapus Data Tabel</button>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', background: '#F8FAFC', border: '1px solid var(--ds-border)', borderRadius: 8, padding: 4 }}>
+              <input type="file" ref={importInvRef} onChange={handleImportInv} accept=".xlsx, .xls" style={{ display: 'none' }} />
+              <button onClick={() => importInvRef.current?.click()} style={{ padding: '6px 12px', background: 'white', color: '#0F172A', border: '1px solid var(--ds-border)', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
+                <Upload size={14} /> Import Excel Khusus
+              </button>
+              <button onClick={() => { setAddInvForm({ ...addInvForm, tahun: displayYears[displayYears.length-1] || '2025' }); setShowAddInvModal(true); }} style={{ padding: '6px 12px', background: 'transparent', color: '#0F172A', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 6 }}>
+                + Input Manual
+              </button>
+            </div>
+            <button onClick={() => handleAutoArchive(displayYears[displayYears.length-1] || '2025', 'inventarisasi')} style={{ padding: '8px 16px', background: '#0F172A', color: 'white', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Database size={16} /> Rekap Otomatis
+            </button>
+          </div>
+        </div>
+        <div style={{ overflowX: 'auto', border: '1px solid var(--ds-border)', borderRadius: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', borderBottom: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <th style={{ padding: '14px 18px', width: 40, borderRight: '1px solid var(--ds-border)' }}>No</th>
+                <th style={{ padding: '14px 18px', fontWeight: 700, borderRight: '1px solid var(--ds-border)' }}>Jenis Limbah</th>
+                {displayYears.map(year => (
+                  <th key={year} style={{ padding: '14px 18px', fontWeight: 700, textAlign: 'right' }}>{year} (Ton)</th>
+                ))}
               </tr>
-            ))}
-            {rekapProgram.filter(rp => rp.tahun === selectedTahunHistoris).length === 0 && (
-              <tr>
-                <td colSpan="5" style={{ padding: '20px', textAlign: 'center', color: 'var(--ds-text-muted)' }}>Belum ada rekapitulasi program untuk tahun ini.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {Object.keys(groupedData).length === 0 ? (
+                <tr><td colSpan={displayYears.length + 2} style={{ padding: 20, textAlign: 'center', color: 'var(--ds-text-muted)' }}>Belum ada data. Silakan Import Excel.</td></tr>
+              ) : (
+                Object.entries(groupedData).map(([category, jenisMap]) => (
+                  <Fragment key={category}>
+                    <tr style={{ background: '#F1F5F9', borderBottom: '1px solid var(--ds-border)' }}>
+                      <td colSpan={displayYears.length + 2} style={{ padding: '10px 18px', fontWeight: 800, fontSize: '0.9rem', color: 'var(--ds-text)' }}>
+                        {category}
+                      </td>
+                    </tr>
+                    {Object.entries(jenisMap).map(([jenis, dataTahun]) => {
+                      const currentNo = rowIndex++;
+                      return (
+                        <tr key={jenis} style={{ borderBottom: '1px solid rgba(203, 213, 225, 0.4)', background: 'white', transition: 'background 0.2s' }}>
+                          <td style={{ padding: '12px 18px', borderRight: '1px solid var(--ds-border)', color: 'var(--ds-text-muted)', fontSize: '0.9rem' }}>{currentNo}</td>
+                          <td style={{ padding: '12px 18px', fontSize: '0.9rem', fontWeight: 600, color: 'var(--ds-text)', borderRight: '1px solid var(--ds-border)' }}>{jenis}</td>
+                          {displayYears.map(year => {
+                            const d = dataTahun[year];
+                            let val = 0;
+                            if (d) {
+                              if (invActiveTab === 'timbulan') val = d.timbulan;
+                              else if (invActiveTab === 'dimanfaatkan') val = d.dimanfaatkan;
+                              else val = d.residu_tpa;
+                            }
+                            
+                            // Untuk interaksi edit/hapus di pivot tabel, klik pada nilai tahun akan men-select data spesifik tahun tersebut
+                            return (
+                              <td key={year} onClick={() => d && setSelectedRow(selectedRow?.id === d.id ? null : d.rawItem)} style={{ padding: '12px 18px', fontSize: '0.9rem', color: val > 0 ? 'var(--ds-text)' : '#CBD5E1', textAlign: 'right', background: selectedRow?.id === d?.id ? '#E0F2FE' : 'transparent', cursor: d ? 'pointer' : 'default' }}>
+                                {val > 0 ? Number(val).toFixed(3) : '-'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderDataUserDB = () => {
     const activeData = userSourceTab === 'mysql' ? mysqlUsers : firebaseUsers;
@@ -1451,7 +1525,6 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
           {currentPage === 'reports' && renderLaporan()}
           {currentPage === 'neraca' && renderNeraca()}
           {currentPage === 'inventarisasi' && renderInventarisasi()}
-          {currentPage === 'rekap-program' && renderRekapProgram()}
           {currentPage === 'bukti-bayar' && renderBuktiBayar()}
           
           {currentPage === 'data-user-db' && renderDataUserDB()}
@@ -1770,6 +1843,55 @@ export function AdminDashboard({ role, deposits = [], neraca = [], buktiBayar = 
                 onMouseLeave={e => e.target.style.background = '#EF4444'}
               >Logout</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAddInvModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(12, 26, 46, 0.6)', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: 'white', width: '100%', maxWidth: 480, borderRadius: '1.5rem', padding: 32, boxShadow: '0 20px 40px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800 }}>Tambah Data Inventarisasi Historis</h3>
+              <button onClick={() => setShowAddInvModal(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}>&times;</button>
+            </div>
+            <form onSubmit={handleAddInventarisasi} style={{ display: 'grid', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Tahun</label>
+                  <input type="text" required value={addInvForm.tahun} onChange={e => setAddInvForm({ ...addInvForm, tahun: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Kategori</label>
+                  <select value={addInvForm.category} onChange={e => setAddInvForm({ ...addInvForm, category: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }}>
+                    <option value="Organik">Organik</option>
+                    <option value="Anorganik">Anorganik</option>
+                    <option value="Residu">Residu</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Jenis Sampah</label>
+                <input type="text" required placeholder="Contoh: Sisa Makanan, Plastik, dll" value={addInvForm.jenis} onChange={e => setAddInvForm({ ...addInvForm, jenis: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Timbulan (Ton)</label>
+                  <input type="number" step="any" required value={addInvForm.timbulan} onChange={e => setAddInvForm({ ...addInvForm, timbulan: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Dimanfaatkan (Ton)</label>
+                  <input type="number" step="any" required value={addInvForm.dimanfaatkan} onChange={e => setAddInvForm({ ...addInvForm, dimanfaatkan: e.target.value })} style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: 4 }}>Residu TPA (Ton)</label>
+                  <input type="number" step="any" value={addInvForm.residu_tpa} onChange={e => setAddInvForm({ ...addInvForm, residu_tpa: e.target.value })} placeholder="Otomatis" style={{ width: '100%', padding: '10px', border: '1px solid var(--ds-border)', borderRadius: 8 }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={() => setShowAddInvModal(false)} style={{ flex: 1, padding: '12px', background: 'white', border: '1px solid var(--ds-border)', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Batal</button>
+                <button type="submit" style={{ flex: 1, padding: '12px', background: 'var(--ds-accent)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>Simpan</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
